@@ -72,7 +72,10 @@ document.addEventListener("DOMContentLoaded", async function () {
     const rows = parseCSV(text);
 
     if (rows.length < 2) {
-      return [];
+      return {
+        events: [],
+        updated: ""
+      };
     }
 
     const headers = rows[0].map(h =>
@@ -80,6 +83,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     );
 
     const index = {
+      updated: headers.indexOf("Updated"),
       date: headers.indexOf("Date"),
       semester: headers.indexOf("Semester"),
       ay: headers.indexOf("AY"),
@@ -90,7 +94,12 @@ document.addEventListener("DOMContentLoaded", async function () {
       type: headers.indexOf("Event Type")
     };
 
-    return rows.slice(1).map(row => ({
+    const updated =
+      index.updated >= 0
+        ? (rows[1][index.updated] || "").trim()
+        : "";
+
+    const parsedEvents = rows.slice(1).map(row => ({
       date: row[index.date] || "",
       semester: row[index.semester] || "",
       academicYear: row[index.ay] || "",
@@ -103,6 +112,11 @@ document.addEventListener("DOMContentLoaded", async function () {
       total: Number(row[index.total] || 0),
       type: row[index.type] || ""
     }));
+
+    return {
+      events: parsedEvents,
+      updated: updated
+    };
   }
 
   function populateFilters() {
@@ -371,64 +385,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     searchInput.focus();
   }
 
-  async function loadUpdatedDate() {
-    try {
-      const githubUser =
-        window.location.hostname.split(".")[0];
-
-      const pathParts =
-        window.location.pathname
-          .split("/")
-          .filter(Boolean);
-
-      const repoName = pathParts[0];
-
-      if (!githubUser || !repoName) {
-        return;
-      }
-
-      const commitResponse = await fetch(
-        "https://api.github.com/repos/" +
-        githubUser +
-        "/" +
-        repoName +
-        "/commits?path=CTL_Participation_Master.csv&per_page=1"
-      );
-
-      if (!commitResponse.ok) {
-        return;
-      }
-
-      const commits = await commitResponse.json();
-
-      if (
-        commits.length > 0 &&
-        updatedDate
-      ) {
-        const date = new Date(
-          commits[0].commit.committer.date
-        );
-
-        updatedDate.textContent =
-          "Data updated: " +
-          date.toLocaleDateString(
-            "en-US",
-            {
-              month: "long",
-              day: "numeric",
-              year: "numeric"
-            }
-          );
-      }
-
-    } catch (error) {
-      console.error(
-        "Could not load CSV update date.",
-        error
-      );
-    }
-  }
-
   searchBtn.addEventListener(
     "click",
     runSearch
@@ -476,13 +432,20 @@ document.addEventListener("DOMContentLoaded", async function () {
     const csvText =
       await response.text();
 
-    events =
+    const data =
       loadEventsFromCSV(csvText);
+
+    events = data.events;
+
+    if (updatedDate) {
+      updatedDate.textContent =
+        data.updated
+          ? "Data updated: " + data.updated
+          : "Data updated: —";
+    }
 
     populateFilters();
     renderResults(events, false);
-
-    await loadUpdatedDate();
 
   } catch (error) {
     console.error(error);
