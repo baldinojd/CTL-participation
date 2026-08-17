@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   const head = document.getElementById("head");
   const body = document.getElementById("body");
   const empty = document.getElementById("empty");
+  const updatedDate = document.getElementById("updatedDate");
 
   let events = [];
 
@@ -364,13 +365,30 @@ document.addEventListener("DOMContentLoaded", async function () {
   clearBtn.addEventListener("click", clearSearch);
 
   try {
-    const response = await fetch("CTL_Participation_Master.csv");
+   const response = await fetch("CTL_Participation_Master.csv", {
+  cache: "no-store"
+});
 
-    if (!response.ok) {
-      throw new Error("CSV could not be loaded.");
-    }
+if (!response.ok) {
+  throw new Error("CSV could not be loaded.");
+}
 
-    const csvText = await response.text();
+// Automatically show the date the CSV was last updated
+const lastModified = response.headers.get("Last-Modified");
+
+if (lastModified && updatedDate) {
+  const date = new Date(lastModified);
+
+  updatedDate.textContent =
+    "Data updated: " +
+    date.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric"
+    });
+}
+
+const csvText = await response.text();
 
     events = loadEventsFromCSV(csvText);
 
