@@ -1,0 +1,179 @@
+:root {
+  --navy: #13294b;
+  --line: #d8dee8;
+  --wash: #f4f6f9;
+  --text: #172033;
+  --muted: #667085;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+  margin: 0;
+  background: var(--wash);
+  color: var(--text);
+}
+
+header {
+  background: #ffffff;
+  border-bottom: 7px solid var(--navy);
+  padding: 18px 20px 14px;
+}
+
+header .inner,
+main {
+  max-width: 1220px;
+  margin: auto;
+}
+
+.logo {
+  display: block;
+  width: min(100%, 920px);
+  height: auto;
+}
+
+.title {
+  margin: 10px 0 0;
+  color: var(--navy);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+main {
+  padding: 20px;
+}
+
+.searchbox {
+  background: #ffffff;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: minmax(280px, 2fr) 1fr 1fr auto auto;
+  gap: 10px;
+  align-items: end;
+}
+
+label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 5px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+input,
+select,
+button {
+  font: inherit;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+input,
+select {
+  width: 100%;
+  border: 1px solid #bcc6d3;
+  background: #ffffff;
+}
+
+button {
+  border: 0;
+  background: var(--navy);
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:hover {
+  opacity: .9;
+}
+
+button.secondary {
+  background: #e9eef5;
+  color: var(--navy);
+}
+
+#status {
+  margin-top: 12px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.note {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.results-wrap {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  vertical-align: top;
+  padding: 10px;
+  border-bottom: 1px solid #e5e9ef;
+  font-size: 13px;
+}
+
+th {
+  background: var(--navy);
+  color: #ffffff;
+}
+
+td.date {
+  white-space: nowrap;
+}
+
+td.total {
+  text-align: center;
+}
+
+.empty {
+  padding: 28px;
+  text-align: center;
+  color: var(--muted);
+}
+
+footer {
+  max-width: 1220px;
+  margin: 0 auto 28px;
+  padding: 0 20px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+
+  .controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .searchfield {
+    grid-column: 1 / -1;
+  }
+
+  .results-wrap {
+    overflow-x: auto;
+  }
+}
