@@ -75,7 +75,9 @@ document.addEventListener("DOMContentLoaded", async function () {
       return [];
     }
 
-    const headers = rows[0].map(h => h.trim());
+    const headers = rows[0].map(h =>
+      h.replace(/^\uFEFF/, "").trim()
+    );
 
     const index = {
       date: headers.indexOf("Date"),
@@ -104,8 +106,11 @@ document.addEventListener("DOMContentLoaded", async function () {
   }
 
   function populateFilters() {
-    yearSelect.innerHTML = '<option value="">All years</option>';
-    typeSelect.innerHTML = '<option value="">All event types</option>';
+    yearSelect.innerHTML =
+      '<option value="">All years</option>';
+
+    typeSelect.innerHTML =
+      '<option value="">All event types</option>';
 
     const years = [...new Set(
       events.map(event => event.academicYear)
@@ -267,7 +272,8 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     if (results.length === 0) {
       empty.style.display = "block";
-      status.textContent = "No matching participation records.";
+      status.textContent =
+        "No matching participation records.";
       return;
     }
 
@@ -276,11 +282,25 @@ document.addEventListener("DOMContentLoaded", async function () {
     results.forEach(event => {
       const row = document.createElement("tr");
 
-      row.appendChild(createCell(event.date, "date"));
-      row.appendChild(createCell(event.semester));
-      row.appendChild(createCell(event.academicYear));
-      row.appendChild(createCell(event.topic));
-      row.appendChild(createCell(event.facilitator));
+      row.appendChild(
+        createCell(event.date, "date")
+      );
+
+      row.appendChild(
+        createCell(event.semester)
+      );
+
+      row.appendChild(
+        createCell(event.academicYear)
+      );
+
+      row.appendChild(
+        createCell(event.topic)
+      );
+
+      row.appendChild(
+        createCell(event.facilitator)
+      );
 
       if (!personMode) {
         row.appendChild(
@@ -351,53 +371,124 @@ document.addEventListener("DOMContentLoaded", async function () {
     searchInput.focus();
   }
 
-  searchBtn.addEventListener("click", runSearch);
+  async function loadUpdatedDate() {
+    try {
+      const githubUser =
+        window.location.hostname.split(".")[0];
 
-  searchInput.addEventListener("keydown", function (event) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      runSearch();
+      const pathParts =
+        window.location.pathname
+          .split("/")
+          .filter(Boolean);
+
+      const repoName = pathParts[0];
+
+      if (!githubUser || !repoName) {
+        return;
+      }
+
+      const commitResponse = await fetch(
+        "https://api.github.com/repos/" +
+        githubUser +
+        "/" +
+        repoName +
+        "/commits?path=CTL_Participation_Master.csv&per_page=1"
+      );
+
+      if (!commitResponse.ok) {
+        return;
+      }
+
+      const commits = await commitResponse.json();
+
+      if (
+        commits.length > 0 &&
+        updatedDate
+      ) {
+        const date = new Date(
+          commits[0].commit.committer.date
+        );
+
+        updatedDate.textContent =
+          "Data updated: " +
+          date.toLocaleDateString(
+            "en-US",
+            {
+              month: "long",
+              day: "numeric",
+              year: "numeric"
+            }
+          );
+      }
+
+    } catch (error) {
+      console.error(
+        "Could not load CSV update date.",
+        error
+      );
     }
-  });
+  }
 
-  yearSelect.addEventListener("change", runSearch);
-  typeSelect.addEventListener("change", runSearch);
-  clearBtn.addEventListener("click", clearSearch);
+  searchBtn.addEventListener(
+    "click",
+    runSearch
+  );
+
+  searchInput.addEventListener(
+    "keydown",
+    function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        runSearch();
+      }
+    }
+  );
+
+  yearSelect.addEventListener(
+    "change",
+    runSearch
+  );
+
+  typeSelect.addEventListener(
+    "change",
+    runSearch
+  );
+
+  clearBtn.addEventListener(
+    "click",
+    clearSearch
+  );
 
   try {
-   const response = await fetch("CTL_Participation_Master.csv", {
-  cache: "no-store"
-});
+    const response = await fetch(
+      "CTL_Participation_Master.csv",
+      {
+        cache: "no-store"
+      }
+    );
 
-if (!response.ok) {
-  throw new Error("CSV could not be loaded.");
-}
+    if (!response.ok) {
+      throw new Error(
+        "CSV could not be loaded."
+      );
+    }
 
-// Automatically show the date the CSV was last updated
-const lastModified = response.headers.get("Last-Modified");
+    const csvText =
+      await response.text();
 
-if (lastModified && updatedDate) {
-  const date = new Date(lastModified);
-
-  updatedDate.textContent =
-    "Data updated: " +
-    date.toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric"
-    });
-}
-
-const csvText = await response.text();
-
-    events = loadEventsFromCSV(csvText);
+    events =
+      loadEventsFromCSV(csvText);
 
     populateFilters();
     renderResults(events, false);
 
+    await loadUpdatedDate();
+
   } catch (error) {
     console.error(error);
-    status.textContent = "Participation data could not be loaded.";
+
+    status.textContent =
+      "Participation data could not be loaded.";
   }
 
 });
