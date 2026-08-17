@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>CTL Participation Search</title>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <header>
+    <div class="inner">
+      <img
+        class="logo"
+        src="ctl-logo.png"
+        alt="Center for Teaching and Learning, Lackawanna College"
+      >
+
+      <div class="title">Participation Search</div>
+    </div>
+  </header>
+
+  <main>
+
+    <section class="searchbox">
+
+      <div class="controls">
+
+        <div class="searchfield">
+          <label for="search">Search</label>
+
+          <input
+            id="search"
+            type="text"
+            placeholder="Search by name, topic, keyword, or facilitator"
+          >
+        </div>
+
+        <div>
+          <label for="year">Academic Year</label>
+
+          <select id="year">
+            <option value="">All years</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="type">Event Type</label>
+
+          <select id="type">
+            <option value="">All event types</option>
+          </select>
+        </div>
+
+        <button type="button" id="searchBtn">
+          Search
+        </button>
+
+        <button type="button" id="clearBtn" class="secondary">
+          Clear
+        </button>
+
+      </div>
+
+      <div id="status">
+        Loading participation records...
+      </div>
+
+      <div class="note">
+        Person searches accept First Last, Last, First, or Last.
+      </div>
+
+    </section>
+
+
+    <div class="results-wrap">
+
+      <table>
+
+        <thead id="head"></thead>
+
+        <tbody id="body"></tbody>
+
+      </table>
+
+      <div
+        id="empty"
+        class="empty"
+        style="display:none"
+      >
+        No matching participation records.
+      </div>
+
+    </div>
+
+  </main>
+
+
+  <footer>
+    Center for Teaching and Learning · Lackawanna College
+  </footer>
+
+
+  <script src="data.js"></script>
+  <script src="script.js"></script>
+
+</body>
+</html>
