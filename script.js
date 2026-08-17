@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", async function () {
 
   const searchInput = document.getElementById("search");
   const yearSelect = document.getElementById("year");
@@ -10,12 +10,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const body = document.getElementById("body");
   const empty = document.getElementById("empty");
 
-  if (typeof CTL_DATA === "undefined") {
-    status.textContent = "Participation data could not be loaded.";
-    return;
-  }
-
-  const events = CTL_DATA;
+  let events = [];
 
   function normalize(value) {
     return String(value || "")
@@ -25,7 +20,91 @@ document.addEventListener("DOMContentLoaded", function () {
       .trim();
   }
 
+  function parseCSV(text) {
+    const rows = [];
+    let row = [];
+    let field = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const next = text[i + 1];
+
+      if (char === '"' && inQuotes && next === '"') {
+        field += '"';
+        i++;
+      } else if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === "," && !inQuotes) {
+        row.push(field);
+        field = "";
+      } else if ((char === "\n" || char === "\r") && !inQuotes) {
+        if (char === "\r" && next === "\n") {
+          i++;
+        }
+
+        row.push(field);
+        field = "";
+
+        if (row.some(cell => cell.trim() !== "")) {
+          rows.push(row);
+        }
+
+        row = [];
+      } else {
+        field += char;
+      }
+    }
+
+    if (field.length || row.length) {
+      row.push(field);
+
+      if (row.some(cell => cell.trim() !== "")) {
+        rows.push(row);
+      }
+    }
+
+    return rows;
+  }
+
+  function loadEventsFromCSV(text) {
+    const rows = parseCSV(text);
+
+    if (rows.length < 2) {
+      return [];
+    }
+
+    const headers = rows[0].map(h => h.trim());
+
+    const index = {
+      date: headers.indexOf("Date"),
+      semester: headers.indexOf("Semester"),
+      ay: headers.indexOf("AY"),
+      topic: headers.indexOf("Topic"),
+      facilitator: headers.indexOf("Facilitator"),
+      participants: headers.indexOf("Participants"),
+      total: headers.indexOf("Total"),
+      type: headers.indexOf("Event Type")
+    };
+
+    return rows.slice(1).map(row => ({
+      date: row[index.date] || "",
+      semester: row[index.semester] || "",
+      academicYear: row[index.ay] || "",
+      topic: row[index.topic] || "",
+      facilitator: row[index.facilitator] || "",
+      participants: (row[index.participants] || "")
+        .split(";")
+        .map(name => name.trim())
+        .filter(Boolean),
+      total: Number(row[index.total] || 0),
+      type: row[index.type] || ""
+    }));
+  }
+
   function populateFilters() {
+    yearSelect.innerHTML = '<option value="">All years</option>';
+    typeSelect.innerHTML = '<option value="">All event types</option>';
 
     const years = [...new Set(
       events.map(event => event.academicYear)
@@ -61,7 +140,6 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function matchesPerson(name, query) {
-
     const normalizedName = normalize(name);
     const normalizedQuery = normalize(query);
 
@@ -77,11 +155,9 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function findMatchingPeople(query) {
-
     const people = new Set();
 
     events.forEach(event => {
-
       if (event.facilitator) {
         people.add(event.facilitator);
       }
@@ -89,7 +165,6 @@ document.addEventListener("DOMContentLoaded", function () {
       event.participants.forEach(person => {
         people.add(person);
       });
-
     });
 
     return [...people].filter(person =>
@@ -98,7 +173,6 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function isPersonSearch(query) {
-
     if (!query.trim()) {
       return false;
     }
@@ -107,7 +181,6 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function eventMatchesPerson(event, query) {
-
     if (
       event.facilitator &&
       matchesPerson(event.facilitator, query)
@@ -121,7 +194,6 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function eventMatchesGeneralSearch(event, query) {
-
     const q = normalize(query);
 
     if (!q) {
@@ -146,7 +218,6 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function createCell(text, className) {
-
     const td = document.createElement("td");
 
     if (className) {
@@ -159,7 +230,6 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function setPersonHeader() {
-
     head.innerHTML = `
       <tr>
         <th>Date</th>
@@ -172,7 +242,6 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function setEventHeader() {
-
     head.innerHTML = `
       <tr>
         <th>Date</th>
@@ -187,7 +256,6 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function renderResults(results, personMode) {
-
     body.innerHTML = "";
 
     if (personMode) {
@@ -197,43 +265,23 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     if (results.length === 0) {
-
       empty.style.display = "block";
-
-      status.textContent =
-        "No matching participation records.";
-
+      status.textContent = "No matching participation records.";
       return;
     }
 
     empty.style.display = "none";
 
     results.forEach(event => {
-
       const row = document.createElement("tr");
 
-      row.appendChild(
-        createCell(event.date, "date")
-      );
-
-      row.appendChild(
-        createCell(event.semester)
-      );
-
-      row.appendChild(
-        createCell(event.academicYear)
-      );
-
-      row.appendChild(
-        createCell(event.topic)
-      );
-
-      row.appendChild(
-        createCell(event.facilitator)
-      );
+      row.appendChild(createCell(event.date, "date"));
+      row.appendChild(createCell(event.semester));
+      row.appendChild(createCell(event.academicYear));
+      row.appendChild(createCell(event.topic));
+      row.appendChild(createCell(event.facilitator));
 
       if (!personMode) {
-
         row.appendChild(
           createCell(event.participants.join(", "))
         );
@@ -255,7 +303,6 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function runSearch() {
-
     const query = searchInput.value.trim();
     const selectedYear = yearSelect.value;
     const selectedType = typeSelect.value;
@@ -263,7 +310,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const personMode = isPersonSearch(query);
 
     const results = events.filter(event => {
-
       const yearMatch =
         !selectedYear ||
         event.academicYear === selectedYear;
@@ -275,7 +321,6 @@ document.addEventListener("DOMContentLoaded", function () {
       let searchMatch = true;
 
       if (query) {
-
         if (personMode) {
           searchMatch =
             eventMatchesPerson(event, query);
@@ -296,7 +341,6 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function clearSearch() {
-
     searchInput.value = "";
     yearSelect.value = "";
     typeSelect.value = "";
@@ -306,39 +350,36 @@ document.addEventListener("DOMContentLoaded", function () {
     searchInput.focus();
   }
 
-  searchBtn.addEventListener(
-    "click",
-    runSearch
-  );
+  searchBtn.addEventListener("click", runSearch);
 
-  searchInput.addEventListener(
-    "keydown",
-    function (event) {
-
-      if (event.key === "Enter") {
-        event.preventDefault();
-        runSearch();
-      }
+  searchInput.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      runSearch();
     }
-  );
+  });
 
-  yearSelect.addEventListener(
-    "change",
-    runSearch
-  );
+  yearSelect.addEventListener("change", runSearch);
+  typeSelect.addEventListener("change", runSearch);
+  clearBtn.addEventListener("click", clearSearch);
 
-  typeSelect.addEventListener(
-    "change",
-    runSearch
-  );
+  try {
+    const response = await fetch("CTL_Participation_Master.csv");
 
-  clearBtn.addEventListener(
-    "click",
-    clearSearch
-  );
+    if (!response.ok) {
+      throw new Error("CSV could not be loaded.");
+    }
 
-  populateFilters();
+    const csvText = await response.text();
 
-  renderResults(events, false);
+    events = loadEventsFromCSV(csvText);
+
+    populateFilters();
+    renderResults(events, false);
+
+  } catch (error) {
+    console.error(error);
+    status.textContent = "Participation data could not be loaded.";
+  }
 
 });
