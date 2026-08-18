@@ -632,22 +632,26 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   function clearSearch() {
 
-    searchInput.value = "";
-    yearSelect.value = "";
-    semesterSelect.value = "";
-    typeSelect.value = "";
+  searchInput.value = "";
+  yearSelect.value = "";
+  semesterSelect.value = "";
+  typeSelect.value = "";
 
-    selectedPerson = "";
+  selectedPerson = "";
 
-    hidePersonChoices();
-    hidePersonSummary();
+  hidePersonChoices();
+  hidePersonSummary();
 
-    renderResults(
-      events,
-      false
-    );
+  /* Return to the blank starting state */
+  body.innerHTML = "";
+  setEventHeader();
+  empty.style.display = "none";
 
-    searchInput.focus();
+  status.textContent =
+    "Enter a search term or select a filter to begin.";
+
+  searchInput.focus();
+}
   }
 
   /*
