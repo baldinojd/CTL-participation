@@ -18,7 +18,8 @@ document.addEventListener("DOMContentLoaded", async function () {
   let selectedPerson = "";
 
   /*
-    Map:
+    Full-Time Cohort membership index.
+
     normalized person name ->
     {
       name: "Last, First",
@@ -33,6 +34,7 @@ document.addEventListener("DOMContentLoaded", async function () {
      ========================================================= */
 
   function normalize(value) {
+
     return String(value || "")
       .toLowerCase()
       .replace(/[.,;:()]/g, " ")
@@ -48,7 +50,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 
     if (person.includes(",")) {
-      const parts = person.split(",");
+
+      const parts =
+        person.split(",");
 
       return (
         parts.slice(1).join(",").trim() +
@@ -73,10 +77,18 @@ document.addEventListener("DOMContentLoaded", async function () {
     let field = "";
     let inQuotes = false;
 
-    for (let i = 0; i < text.length; i++) {
+    for (
+      let i = 0;
+      i < text.length;
+      i++
+    ) {
 
-      const char = text[i];
-      const next = text[i + 1];
+      const char =
+        text[i];
+
+      const next =
+        text[i + 1];
+
 
       if (
         char === '"' &&
@@ -87,9 +99,12 @@ document.addEventListener("DOMContentLoaded", async function () {
         field += '"';
         i++;
 
-      } else if (char === '"') {
+      } else if (
+        char === '"'
+      ) {
 
-        inQuotes = !inQuotes;
+        inQuotes =
+          !inQuotes;
 
       } else if (
         char === "," &&
@@ -100,7 +115,10 @@ document.addEventListener("DOMContentLoaded", async function () {
         field = "";
 
       } else if (
-        (char === "\n" || char === "\r") &&
+        (
+          char === "\n" ||
+          char === "\r"
+        ) &&
         !inQuotes
       ) {
 
@@ -116,7 +134,8 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         if (
           row.some(
-            cell => cell.trim() !== ""
+            cell =>
+              cell.trim() !== ""
           )
         ) {
           rows.push(row);
@@ -140,12 +159,14 @@ document.addEventListener("DOMContentLoaded", async function () {
 
       if (
         row.some(
-          cell => cell.trim() !== ""
+          cell =>
+            cell.trim() !== ""
         )
       ) {
         rows.push(row);
       }
     }
+
 
     return rows;
   }
@@ -167,39 +188,84 @@ document.addEventListener("DOMContentLoaded", async function () {
 
 
   /* =========================================================
-     MAIN CTL PARTICIPATION DATA
+     GENERAL CTL PARTICIPATION DATA
      ========================================================= */
 
   function loadParticipationCSV(text) {
 
-    const rows = parseCSV(text);
+    const rows =
+      parseCSV(text);
 
-    if (rows.length < 2) {
+    if (
+      rows.length < 2
+    ) {
+
       return {
         events: [],
         updated: ""
       };
     }
 
-    const headers = getHeaders(rows);
+
+    const headers =
+      getHeaders(rows);
+
 
     const index = {
-      updated: headers.indexOf("Updated"),
-      date: headers.indexOf("Date"),
-      semester: headers.indexOf("Semester"),
-      ay: headers.indexOf("AY"),
-      topic: headers.indexOf("Topic"),
-      facilitator: headers.indexOf("Facilitator"),
-      participants: headers.indexOf("Participants"),
-      total: headers.indexOf("Total"),
-      type: headers.indexOf("Event Type")
+
+      updated:
+        headers.indexOf(
+          "Updated"
+        ),
+
+      date:
+        headers.indexOf(
+          "Date"
+        ),
+
+      semester:
+        headers.indexOf(
+          "Semester"
+        ),
+
+      ay:
+        headers.indexOf(
+          "AY"
+        ),
+
+      topic:
+        headers.indexOf(
+          "Topic"
+        ),
+
+      facilitator:
+        headers.indexOf(
+          "Facilitator"
+        ),
+
+      participants:
+        headers.indexOf(
+          "Participants"
+        ),
+
+      total:
+        headers.indexOf(
+          "Total"
+        ),
+
+      type:
+        headers.indexOf(
+          "Event Type"
+        )
     };
 
 
     const updated =
       index.updated >= 0
         ? (
-            rows[1][index.updated] || ""
+            rows[1][
+              index.updated
+            ] || ""
           ).trim()
         : "";
 
@@ -207,44 +273,66 @@ document.addEventListener("DOMContentLoaded", async function () {
     const parsedEvents =
       rows
         .slice(1)
-        .map(row => ({
+        .map(
+          row => ({
 
-          date:
-            row[index.date] || "",
+            date:
+              row[
+                index.date
+              ] || "",
 
-          semester:
-            row[index.semester] || "",
+            semester:
+              row[
+                index.semester
+              ] || "",
 
-          academicYear:
-            row[index.ay] || "",
+            academicYear:
+              row[
+                index.ay
+              ] || "",
 
-          topic:
-            row[index.topic] || "",
+            topic:
+              row[
+                index.topic
+              ] || "",
 
-          facilitator:
-            row[index.facilitator] || "",
+            facilitator:
+              row[
+                index.facilitator
+              ] || "",
 
-          participants:
-            (
-              row[index.participants] || ""
-            )
-              .split(";")
-              .map(
-                name => name.trim()
+            participants:
+              (
+                row[
+                  index.participants
+                ] || ""
               )
-              .filter(Boolean),
+                .split(";")
+                .map(
+                  name =>
+                    name.trim()
+                )
+                .filter(Boolean),
 
-          total:
-            Number(
-              row[index.total] || 0
-            ),
+            total:
+              Number(
+                row[
+                  index.total
+                ] || 0
+              ),
 
-          type:
-            row[index.type] || "",
+            type:
+              row[
+                index.type
+              ] || "",
 
-          source:
-            "Participation"
-        }));
+            source:
+              "Participation",
+
+            rosterOnly:
+              false
+          })
+        );
 
 
     return {
@@ -260,83 +348,114 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   function loadCohortMembershipCSV(text) {
 
-    const rows = parseCSV(text);
+    const rows =
+      parseCSV(text);
 
-    if (rows.length < 2) {
+    if (
+      rows.length < 2
+    ) {
       return;
     }
 
-    const headers = getHeaders(rows);
+
+    const headers =
+      getHeaders(rows);
+
 
     const ayIndex =
-      headers.indexOf("AY");
+      headers.indexOf(
+        "AY"
+      );
+
 
     const participantIndex =
-      headers.indexOf("Participant");
+      headers.indexOf(
+        "Participant"
+      );
 
 
     rows
       .slice(1)
-      .forEach(row => {
+      .forEach(
+        row => {
 
-        const ay =
-          (
-            row[ayIndex] || ""
-          ).trim();
-
-        const participant =
-          (
-            row[participantIndex] || ""
-          ).trim();
+          const ay =
+            (
+              row[
+                ayIndex
+              ] || ""
+            ).trim();
 
 
-        if (
-          !ay ||
-          !participant
-        ) {
-          return;
+          const participant =
+            (
+              row[
+                participantIndex
+              ] || ""
+            ).trim();
+
+
+          if (
+            !ay ||
+            !participant
+          ) {
+            return;
+          }
+
+
+          const key =
+            normalize(
+              participant
+            );
+
+
+          if (
+            !cohortMembership.has(
+              key
+            )
+          ) {
+
+            cohortMembership.set(
+              key,
+              {
+                name:
+                  participant,
+
+                years:
+                  new Set()
+              }
+            );
+          }
+
+
+          cohortMembership
+            .get(key)
+            .years
+            .add(ay);
         }
-
-
-        const key =
-          normalize(participant);
-
-
-        if (
-          !cohortMembership.has(key)
-        ) {
-
-          cohortMembership.set(
-            key,
-            {
-              name: participant,
-              years: new Set()
-            }
-          );
-        }
-
-
-        cohortMembership
-          .get(key)
-          .years
-          .add(ay);
-      });
+      );
   }
 
 
-  function getCohortYears(person) {
+  function getCohortYears(
+    person
+  ) {
 
     const record =
       cohortMembership.get(
         normalize(person)
       );
 
+
     if (!record) {
       return [];
     }
 
+
     return Array
-      .from(record.years)
+      .from(
+        record.years
+      )
       .sort();
   }
 
@@ -347,43 +466,61 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   function loadCohortAttendanceCSV(text) {
 
-    const rows = parseCSV(text);
+    const rows =
+      parseCSV(text);
 
-    if (rows.length < 2) {
+
+    if (
+      rows.length < 2
+    ) {
       return [];
     }
 
-    const headers = getHeaders(rows);
+
+    const headers =
+      getHeaders(rows);
+
 
     const index = {
+
       ay:
-        headers.indexOf("AY"),
+        headers.indexOf(
+          "AY"
+        ),
 
       participant:
-        headers.indexOf("Participant"),
+        headers.indexOf(
+          "Participant"
+        ),
 
       semester:
-        headers.indexOf("Semester"),
+        headers.indexOf(
+          "Semester"
+        ),
 
       title:
-        headers.indexOf("Session Title"),
+        headers.indexOf(
+          "Session Title"
+        ),
 
       date:
-        headers.indexOf("Date"),
+        headers.indexOf(
+          "Date"
+        ),
 
       attended:
-        headers.indexOf("Attended")
+        headers.indexOf(
+          "Attended"
+        )
     };
 
 
     /*
-      Convert person/session rows into event-style
-      records so the existing search/results system
-      can treat FT Cohort sessions like other CTL
-      offerings.
+      Convert person/session attendance rows
+      into event-style records.
 
-      Group key:
-      AY + Semester + Date + Session Title
+      Session identity is based on:
+      AY + Semester + Date + Session Title.
     */
 
     const groupedSessions =
@@ -392,115 +529,153 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     rows
       .slice(1)
-      .forEach(row => {
+      .forEach(
+        row => {
 
-        const ay =
-          (
-            row[index.ay] || ""
-          ).trim();
-
-        const participant =
-          (
-            row[index.participant] || ""
-          ).trim();
-
-        const semester =
-          (
-            row[index.semester] || ""
-          ).trim();
-
-        const title =
-          (
-            row[index.title] || ""
-          ).trim();
-
-        const date =
-          (
-            row[index.date] || ""
-          ).trim();
-
-        const attended =
-          (
-            row[index.attended] || ""
-          ).trim()
-           .toLowerCase();
+          const ay =
+            (
+              row[
+                index.ay
+              ] || ""
+            ).trim();
 
 
-        if (
-          !ay ||
-          !participant ||
-          !title
-        ) {
-          return;
-        }
+          const participant =
+            (
+              row[
+                index.participant
+              ] || ""
+            ).trim();
 
 
-        /*
-          Only affirmative attendance gets added
-          to the event participant list.
-
-          This is what prevents Allison Mayer's
-          two documented absences from appearing
-          as sessions attended.
-        */
-
-        const didAttend =
-          (
-            attended === "yes" ||
-            attended === "y" ||
-            attended === "true" ||
-            attended === "1"
-          );
+          const semester =
+            (
+              row[
+                index.semester
+              ] || ""
+            ).trim();
 
 
-        const key = [
-          ay,
-          semester,
-          date,
-          title
-        ].join("|||");
+          const title =
+            (
+              row[
+                index.title
+              ] || ""
+            ).trim();
 
 
-        if (
-          !groupedSessions.has(key)
-        ) {
-
-          groupedSessions.set(
-            key,
-            {
-              date: date,
-              semester: semester,
-              academicYear: ay,
-              topic: title,
-              facilitator: "",
-              participants: [],
-              total: 0,
-              type: "Full-Time Cohort",
-              source: "Full-Time Cohort"
-            }
-          );
-        }
+          const date =
+            (
+              row[
+                index.date
+              ] || ""
+            ).trim();
 
 
-        if (didAttend) {
+          const attended =
+            (
+              row[
+                index.attended
+              ] || ""
+            )
+              .trim()
+              .toLowerCase();
 
-          const session =
-            groupedSessions.get(key);
 
           if (
-            !session.participants.some(
-              existing =>
-                normalize(existing) ===
-                normalize(participant)
+            !ay ||
+            !participant ||
+            !title
+          ) {
+            return;
+          }
+
+
+          const didAttend =
+            (
+              attended === "yes" ||
+              attended === "y" ||
+              attended === "true" ||
+              attended === "1"
+            );
+
+
+          const key =
+            [
+              ay,
+              semester,
+              date,
+              title
+            ].join("|||");
+
+
+          if (
+            !groupedSessions.has(
+              key
             )
           ) {
 
-            session.participants.push(
-              participant
+            groupedSessions.set(
+              key,
+              {
+                date: date,
+                semester: semester,
+                academicYear: ay,
+                topic: title,
+                facilitator: "",
+                participants: [],
+                total: 0,
+                type:
+                  "Full-Time Cohort",
+                source:
+                  "Full-Time Cohort",
+                rosterOnly:
+                  false
+              }
             );
           }
+
+
+          /*
+            Only affirmative attendance is
+            added to the participant list.
+
+            This preserves documented absences,
+            including Allison Mayer's two
+            exceptions.
+          */
+
+          if (didAttend) {
+
+            const session =
+              groupedSessions.get(
+                key
+              );
+
+
+            const alreadyPresent =
+              session.participants.some(
+                existing =>
+                  normalize(
+                    existing
+                  ) ===
+                  normalize(
+                    participant
+                  )
+              );
+
+
+            if (
+              !alreadyPresent
+            ) {
+
+              session.participants.push(
+                participant
+              );
+            }
+          }
         }
-      });
+      );
 
 
     const cohortEvents =
@@ -509,19 +684,158 @@ document.addEventListener("DOMContentLoaded", async function () {
       );
 
 
-    cohortEvents.forEach(event => {
+    cohortEvents.forEach(
+      event => {
 
-      event.participants.sort(
-        (a, b) =>
-          a.localeCompare(b)
-      );
+        event.participants.sort(
+          (a, b) =>
+            a.localeCompare(b)
+        );
 
-      event.total =
-        event.participants.length;
-    });
+        event.total =
+          event.participants.length;
+      }
+    );
 
 
     return cohortEvents;
+  }
+
+
+  /* =========================================================
+     EARLIER FULL-TIME COHORT ROSTERS
+     ========================================================= */
+
+  function buildCohortRosterEvents(
+    cohortEvents
+  ) {
+
+    /*
+      Identify AYs for which documented
+      session-level attendance exists.
+    */
+
+    const detailedYears =
+      new Set(
+        cohortEvents
+          .map(
+            event =>
+              event.academicYear
+          )
+          .filter(Boolean)
+      );
+
+
+    /*
+      Build AY -> cohort roster from the
+      membership CSV.
+    */
+
+    const rosters =
+      new Map();
+
+
+    cohortMembership.forEach(
+      record => {
+
+        record.years.forEach(
+          year => {
+
+            if (
+              !rosters.has(
+                year
+              )
+            ) {
+
+              rosters.set(
+                year,
+                []
+              );
+            }
+
+
+            rosters
+              .get(year)
+              .push(
+                record.name
+              );
+          }
+        );
+      }
+    );
+
+
+    const rosterEvents = [];
+
+
+    rosters.forEach(
+      (
+        people,
+        year
+      ) => {
+
+        /*
+          If we already have documented
+          session-level records for this AY,
+          do not create a roster-only result.
+        */
+
+        if (
+          detailedYears.has(
+            year
+          )
+        ) {
+          return;
+        }
+
+
+        people.sort(
+          (a, b) =>
+            a.localeCompare(b)
+        );
+
+
+        rosterEvents.push({
+
+          date: "",
+
+          semester: "",
+
+          academicYear:
+            year,
+
+          topic:
+            "Full-Time Cohort: AY " +
+            year +
+            " Roster",
+
+          facilitator: "",
+
+          participants:
+            people,
+
+          total:
+            people.length,
+
+          type:
+            "Full-Time Cohort",
+
+          source:
+            "Full-Time Cohort Roster",
+
+          /*
+            Important:
+            this is membership information,
+            NOT a session attended.
+          */
+          rosterOnly:
+            true
+        });
+      }
+    );
+
+
+    return rosterEvents;
   }
 
 
@@ -534,18 +848,22 @@ document.addEventListener("DOMContentLoaded", async function () {
     yearSelect.innerHTML =
       '<option value="">All years</option>';
 
+
     semesterSelect.innerHTML =
       '<option value="">All semesters</option>';
+
 
     typeSelect.innerHTML =
       '<option value="">All event types</option>';
 
 
     /*
-      AY list comes from BOTH event records and
-      cohort membership so a cohort year can be
-      available even if detailed session records
-      have not yet been entered for that AY.
+      AY values come from BOTH event records
+      and cohort membership.
+
+      This allows earlier cohort years to
+      remain searchable even though we do not
+      have session-level attendance for them.
     */
 
     const yearSet =
@@ -564,7 +882,9 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         record.years.forEach(
           year =>
-            yearSet.add(year)
+            yearSet.add(
+              year
+            )
         );
       }
     );
@@ -572,24 +892,31 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     const years =
       Array
-        .from(yearSet)
+        .from(
+          yearSet
+        )
         .sort();
 
 
-    years.forEach(year => {
+    years.forEach(
+      year => {
 
-      const option =
-        document.createElement(
-          "option"
+        const option =
+          document.createElement(
+            "option"
+          );
+
+        option.value =
+          year;
+
+        option.textContent =
+          year;
+
+        yearSelect.appendChild(
+          option
         );
-
-      option.value = year;
-      option.textContent = year;
-
-      yearSelect.appendChild(
-        option
-      );
-    });
+      }
+    );
 
 
     const preferredSemesters = [
@@ -675,6 +1002,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       "Roundtable",
       "Topical Session",
       "Full-Time Cohort",
+      "Focus Group",
       "Headshots",
       "Kickoff",
       "Office Hours"
@@ -698,7 +1026,9 @@ document.addEventListener("DOMContentLoaded", async function () {
       type => {
 
         if (
-          availableTypes.includes(type)
+          availableTypes.includes(
+            type
+          )
         ) {
 
           const option =
@@ -706,8 +1036,11 @@ document.addEventListener("DOMContentLoaded", async function () {
               "option"
             );
 
-          option.value = type;
-          option.textContent = type;
+          option.value =
+            type;
+
+          option.textContent =
+            type;
 
           typeSelect.appendChild(
             option
@@ -733,8 +1066,11 @@ document.addEventListener("DOMContentLoaded", async function () {
               "option"
             );
 
-          option.value = type;
-          option.textContent = type;
+          option.value =
+            type;
+
+          option.textContent =
+            type;
 
           typeSelect.appendChild(
             option
@@ -754,61 +1090,78 @@ document.addEventListener("DOMContentLoaded", async function () {
       new Map();
 
 
-    events.forEach(event => {
-
-      if (event.facilitator) {
-
-        const key =
-          normalize(
-            event.facilitator
-          );
+    events.forEach(
+      event => {
 
         if (
-          !people.has(key)
+          event.facilitator
         ) {
 
-          people.set(
-            key,
-            event.facilitator
-          );
-        }
-      }
-
-
-      event.participants.forEach(
-        person => {
-
           const key =
-            normalize(person);
+            normalize(
+              event.facilitator
+            );
+
 
           if (
-            !people.has(key)
+            !people.has(
+              key
+            )
           ) {
 
             people.set(
               key,
-              person
+              event.facilitator
             );
           }
         }
-      );
-    });
+
+
+        event.participants.forEach(
+          person => {
+
+            const key =
+              normalize(
+                person
+              );
+
+
+            if (
+              !people.has(
+                key
+              )
+            ) {
+
+              people.set(
+                key,
+                person
+              );
+            }
+          }
+        );
+      }
+    );
 
 
     /*
-      Include cohort members even if we do not
-      yet have historical session-level records
-      for their cohort year.
+      Include every cohort member, including
+      people whose AY predates the documented
+      session-attendance dataset.
     */
 
     cohortMembership.forEach(
       record => {
 
         const key =
-          normalize(record.name);
+          normalize(
+            record.name
+          );
+
 
         if (
-          !people.has(key)
+          !people.has(
+            key
+          )
         ) {
 
           people.set(
@@ -837,17 +1190,22 @@ document.addEventListener("DOMContentLoaded", async function () {
     const normalizedName =
       normalize(name);
 
+
     const normalizedQuery =
       normalize(query);
 
 
-    if (!normalizedQuery) {
+    if (
+      !normalizedQuery
+    ) {
       return false;
     }
 
 
     const queryParts =
-      normalizedQuery.split(" ");
+      normalizedQuery.split(
+        " "
+      );
 
 
     return queryParts.every(
@@ -880,7 +1238,9 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     return (
       normalize(name) ===
-      normalize(selectedName)
+      normalize(
+        selectedName
+      )
     );
   }
 
@@ -915,13 +1275,17 @@ document.addEventListener("DOMContentLoaded", async function () {
      FILTERING
      ========================================================= */
 
-  function passesFilters(event) {
+  function passesFilters(
+    event
+  ) {
 
     const selectedYear =
       yearSelect.value;
 
+
     const selectedSemester =
       semesterSelect.value;
+
 
     const selectedType =
       typeSelect.value;
@@ -932,6 +1296,15 @@ document.addEventListener("DOMContentLoaded", async function () {
       event.academicYear ===
         selectedYear;
 
+
+    /*
+      Roster-only records have no semester
+      because we only know AY membership.
+
+      If the user selects a semester, roster-only
+      records are therefore excluded rather than
+      implying Fall/Spring membership.
+    */
 
     const semesterMatch =
       !selectedSemester ||
@@ -959,7 +1332,9 @@ document.addEventListener("DOMContentLoaded", async function () {
   ) {
 
     const q =
-      normalize(query);
+      normalize(
+        query
+      );
 
 
     if (!q) {
@@ -982,7 +1357,9 @@ document.addEventListener("DOMContentLoaded", async function () {
 
 
     const queryParts =
-      q.split(" ");
+      q.split(
+        " "
+      );
 
 
     return queryParts.every(
@@ -1009,7 +1386,9 @@ document.addEventListener("DOMContentLoaded", async function () {
       );
 
 
-    if (className) {
+    if (
+      className
+    ) {
       td.className =
         className;
     }
@@ -1059,7 +1438,8 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   function hidePersonChoices() {
 
-    personChoices.innerHTML = "";
+    personChoices.innerHTML =
+      "";
 
     personChoices.style.display =
       "none";
@@ -1068,7 +1448,8 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   function hidePersonSummary() {
 
-    personSummary.innerHTML = "";
+    personSummary.innerHTML =
+      "";
 
     personSummary.style.display =
       "none";
@@ -1080,11 +1461,15 @@ document.addEventListener("DOMContentLoaded", async function () {
     people
   ) {
 
-    selectedPerson = "";
+    selectedPerson =
+      "";
+
 
     hidePersonSummary();
 
-    personChoices.innerHTML = "";
+
+    personChoices.innerHTML =
+      "";
 
 
     const message =
@@ -1092,8 +1477,10 @@ document.addEventListener("DOMContentLoaded", async function () {
         "div"
       );
 
+
     message.className =
       "person-choice-message";
+
 
     message.textContent =
       'Multiple people match "' +
@@ -1111,59 +1498,74 @@ document.addEventListener("DOMContentLoaded", async function () {
         "div"
       );
 
+
     buttons.className =
       "person-choice-buttons";
 
 
-    people.forEach(person => {
+    people.forEach(
+      person => {
 
-      const button =
-        document.createElement(
-          "button"
-        );
-
-      button.type = "button";
-
-      button.className =
-        "person-choice-button";
-
-      button.textContent =
-        displayPersonName(person);
+        const button =
+          document.createElement(
+            "button"
+          );
 
 
-      button.addEventListener(
-        "click",
-        function () {
+        button.type =
+          "button";
 
-          selectedPerson =
-            person;
 
-          hidePersonChoices();
+        button.className =
+          "person-choice-button";
 
-          runPersonSearch(
+
+        button.textContent =
+          displayPersonName(
             person
           );
-        }
-      );
 
 
-      buttons.appendChild(
-        button
-      );
-    });
+        button.addEventListener(
+          "click",
+          function () {
+
+            selectedPerson =
+              person;
+
+
+            hidePersonChoices();
+
+
+            runPersonSearch(
+              person
+            );
+          }
+        );
+
+
+        buttons.appendChild(
+          button
+        );
+      }
+    );
 
 
     personChoices.appendChild(
       buttons
     );
 
+
     personChoices.style.display =
       "block";
 
 
-    body.innerHTML = "";
+    body.innerHTML =
+      "";
+
 
     setPersonHeader();
+
 
     empty.style.display =
       "none";
@@ -1223,6 +1625,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     personSummary.innerHTML =
       html;
 
+
     personSummary.style.display =
       "block";
   }
@@ -1237,10 +1640,13 @@ document.addEventListener("DOMContentLoaded", async function () {
     personMode
   ) {
 
-    body.innerHTML = "";
+    body.innerHTML =
+      "";
 
 
-    if (personMode) {
+    if (
+      personMode
+    ) {
 
       setPersonHeader();
 
@@ -1257,8 +1663,10 @@ document.addEventListener("DOMContentLoaded", async function () {
       empty.style.display =
         "block";
 
+
       status.textContent =
         "No matching participation records.";
+
 
       return;
     }
@@ -1268,76 +1676,80 @@ document.addEventListener("DOMContentLoaded", async function () {
       "none";
 
 
-    results.forEach(event => {
+    results.forEach(
+      event => {
 
-      const row =
-        document.createElement(
-          "tr"
-        );
+        const row =
+          document.createElement(
+            "tr"
+          );
 
-
-      row.appendChild(
-        createCell(
-          event.date,
-          "date"
-        )
-      );
-
-
-      row.appendChild(
-        createCell(
-          event.semester
-        )
-      );
-
-
-      row.appendChild(
-        createCell(
-          event.academicYear
-        )
-      );
-
-
-      row.appendChild(
-        createCell(
-          event.topic
-        )
-      );
-
-
-      row.appendChild(
-        createCell(
-          event.facilitator
-        )
-      );
-
-
-      if (!personMode) {
 
         row.appendChild(
           createCell(
-            event.participants.join(
-              ", "
+            event.date,
+            "date"
+          )
+        );
+
+
+        row.appendChild(
+          createCell(
+            event.semester
+          )
+        );
+
+
+        row.appendChild(
+          createCell(
+            event.academicYear
+          )
+        );
+
+
+        row.appendChild(
+          createCell(
+            event.topic
+          )
+        );
+
+
+        row.appendChild(
+          createCell(
+            event.facilitator
+          )
+        );
+
+
+        if (
+          !personMode
+        ) {
+
+          row.appendChild(
+            createCell(
+              event.participants.join(
+                ", "
+              )
             )
-          )
-        );
+          );
 
 
-        row.appendChild(
-          createCell(
-            String(
-              event.total
-            ),
-            "total"
-          )
+          row.appendChild(
+            createCell(
+              String(
+                event.total
+              ),
+              "total"
+            )
+          );
+        }
+
+
+        body.appendChild(
+          row
         );
       }
-
-
-      body.appendChild(
-        row
-      );
-    });
+    );
 
 
     status.textContent =
@@ -1363,10 +1775,23 @@ document.addEventListener("DOMContentLoaded", async function () {
       person;
 
 
+    /*
+      Roster-only records are deliberately
+      excluded from a person's attended-session
+      results.
+
+      Membership still appears in the summary,
+      but it does NOT increase
+      Total Sessions Attended.
+    */
+
     const results =
       events.filter(
         event =>
-          passesFilters(event) &&
+          !event.rosterOnly &&
+          passesFilters(
+            event
+          ) &&
           eventIncludesPerson(
             event,
             person
@@ -1394,7 +1819,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     query
   ) {
 
-    selectedPerson = "";
+    selectedPerson =
+      "";
+
 
     hidePersonChoices();
     hidePersonSummary();
@@ -1403,7 +1830,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     const results =
       events.filter(
         event =>
-          passesFilters(event) &&
+          passesFilters(
+            event
+          ) &&
           eventMatchesGeneralSearch(
             event,
             query
@@ -1429,7 +1858,9 @@ document.addEventListener("DOMContentLoaded", async function () {
       when AY, Semester, or Event Type changes.
     */
 
-    if (selectedPerson) {
+    if (
+      selectedPerson
+    ) {
 
       runPersonSearch(
         selectedPerson
@@ -1440,8 +1871,8 @@ document.addEventListener("DOMContentLoaded", async function () {
 
 
     /*
-      No text is okay when the user is using
-      one or more dropdown filters.
+      No text is required if at least one
+      dropdown filter has been selected.
     */
 
     if (!query) {
@@ -1452,25 +1883,35 @@ document.addEventListener("DOMContentLoaded", async function () {
         typeSelect.value;
 
 
-      if (hasFilter) {
+      if (
+        hasFilter
+      ) {
 
-        runGeneralSearch("");
+        runGeneralSearch(
+          ""
+        );
 
       } else {
 
-        body.innerHTML = "";
+        body.innerHTML =
+          "";
+
 
         setEventHeader();
+
 
         empty.style.display =
           "none";
 
+
         hidePersonChoices();
         hidePersonSummary();
+
 
         status.textContent =
           "Enter a search term or select a filter to begin.";
       }
+
 
       return;
     }
@@ -1489,9 +1930,11 @@ document.addEventListener("DOMContentLoaded", async function () {
       selectedPerson =
         matchingPeople[0];
 
+
       runPersonSearch(
         matchingPeople[0]
       );
+
 
       return;
     }
@@ -1505,6 +1948,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         query,
         matchingPeople
       );
+
 
       return;
     }
@@ -1522,25 +1966,44 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   function clearSearch() {
 
-    searchInput.value = "";
-    yearSelect.value = "";
-    semesterSelect.value = "";
-    typeSelect.value = "";
+    searchInput.value =
+      "";
 
-    selectedPerson = "";
+
+    yearSelect.value =
+      "";
+
+
+    semesterSelect.value =
+      "";
+
+
+    typeSelect.value =
+      "";
+
+
+    selectedPerson =
+      "";
+
 
     hidePersonChoices();
     hidePersonSummary();
 
-    body.innerHTML = "";
+
+    body.innerHTML =
+      "";
+
 
     setEventHeader();
+
 
     empty.style.display =
       "none";
 
+
     status.textContent =
       "Enter a search term or select a filter to begin.";
+
 
     searchInput.focus();
   }
@@ -1554,7 +2017,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     "input",
     function () {
 
-      selectedPerson = "";
+      selectedPerson =
+        "";
+
 
       hidePersonChoices();
       hidePersonSummary();
@@ -1573,10 +2038,12 @@ document.addEventListener("DOMContentLoaded", async function () {
     function (event) {
 
       if (
-        event.key === "Enter"
+        event.key ===
+        "Enter"
       ) {
 
         event.preventDefault();
+
 
         runSearch();
       }
@@ -1623,21 +2090,24 @@ document.addEventListener("DOMContentLoaded", async function () {
       fetch(
         "CTL_Participation_Master.csv",
         {
-          cache: "no-store"
+          cache:
+            "no-store"
         }
       ),
 
       fetch(
         "CTL_Full_Time_Cohort.csv",
         {
-          cache: "no-store"
+          cache:
+            "no-store"
         }
       ),
 
       fetch(
         "CTL_Full_Time_Cohort_Attendance.csv",
         {
-          cache: "no-store"
+          cache:
+            "no-store"
         }
       )
 
@@ -1647,6 +2117,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     if (
       !participationResponse.ok
     ) {
+
       throw new Error(
         "CTL participation data could not be loaded."
       );
@@ -1656,6 +2127,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     if (
       !membershipResponse.ok
     ) {
+
       throw new Error(
         "Full-Time Cohort membership data could not be loaded."
       );
@@ -1665,6 +2137,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     if (
       !cohortAttendanceResponse.ok
     ) {
+
       throw new Error(
         "Full-Time Cohort attendance data could not be loaded."
       );
@@ -1678,15 +2151,17 @@ document.addEventListener("DOMContentLoaded", async function () {
     ] = await Promise.all([
 
       participationResponse.text(),
+
       membershipResponse.text(),
+
       cohortAttendanceResponse.text()
 
     ]);
 
 
     /*
-      Load cohort membership before populating
-      the filters/person index.
+      Load membership first because the roster
+      records depend on it.
     */
 
     loadCohortMembershipCSV(
@@ -1707,16 +2182,33 @@ document.addEventListener("DOMContentLoaded", async function () {
 
 
     /*
-      Main event collection searched by the site.
+      Create searchable roster-only records for
+      AYs where membership is documented but
+      session-level attendance is not.
+
+      No sessions are invented.
+    */
+
+    const cohortRosterEvents =
+      buildCohortRosterEvents(
+        cohortEvents
+      );
+
+
+    /*
+      Combined searchable dataset.
     */
 
     events = [
       ...participationData.events,
-      ...cohortEvents
+      ...cohortEvents,
+      ...cohortRosterEvents
     ];
 
 
-    if (updatedDate) {
+    if (
+      updatedDate
+    ) {
 
       updatedDate.textContent =
         participationData.updated
@@ -1733,12 +2225,16 @@ document.addEventListener("DOMContentLoaded", async function () {
       Blank initial state.
     */
 
-    body.innerHTML = "";
+    body.innerHTML =
+      "";
+
 
     setEventHeader();
 
+
     empty.style.display =
       "none";
+
 
     status.textContent =
       "Enter a search term or select a filter to begin.";
@@ -1746,7 +2242,10 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      error
+    );
+
 
     status.textContent =
       "Participation data could not be loaded.";
