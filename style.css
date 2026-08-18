@@ -363,3 +363,33 @@ footer {
     padding: 11px 10px;
   }
 }
+/* DESKTOP SEARCH LAYOUT OVERRIDE */
+
+@media (min-width: 901px) {
+
+  .search-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 1fr auto !important;
+    column-gap: 16px !important;
+    row-gap: 14px !important;
+    align-items: end !important;
+  }
+
+  .search-grid .search-field {
+    grid-column: 1 / 5 !important;
+    width: 100% !important;
+  }
+
+  .search-grid .field:not(.search-field) {
+    width: auto !important;
+    min-width: 0 !important;
+  }
+
+  .search-grid .button-group {
+    width: auto !important;
+    display: flex !important;
+    gap: 8px !important;
+    align-items: end !important;
+  }
+
+}
