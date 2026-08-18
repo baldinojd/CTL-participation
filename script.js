@@ -216,8 +216,10 @@ document.addEventListener("DOMContentLoaded", async function () {
           academicYear:
             row[index.ay] || "",
 
-          topic:
-            row[index.topic] || "",
+         topic:
+  normalize(row[index.topic]) === normalize("One-on-One Office Hours")
+    ? "Office Hours"
+    : row[index.topic] || "",
 
           facilitator:
             row[index.facilitator] || "",
@@ -233,8 +235,10 @@ document.addEventListener("DOMContentLoaded", async function () {
               row[index.total] || 0
             ),
 
-          type:
-            row[index.type] || "",
+type:
+  normalize(row[index.type]) === normalize("One-on-One Office Hours")
+    ? "Office Hours"
+    : row[index.type] || "",
 
           source:
             "Participation",
