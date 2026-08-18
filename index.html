@@ -176,11 +176,486 @@
 
   </main>
 
-  <footer>
-    Center for Teaching and Learning · Lackawanna College
-  </footer>
+<footer>
+  Center for Teaching and Learning · Lackawanna College
+</footer>
 
-  <script src="script.js"></script>
+<script src="script.js"></script>
+
+
+<!-- =========================================================
+     CTL RESULTS EXPORT TOOLS
+     Print | Save as PDF | Save as CSV (Excel)
+     ========================================================= -->
+
+<style>
+
+  #exportTools {
+    display: none;
+    max-width: 1400px;
+    margin: 0 auto 24px auto;
+    padding: 0 28px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  #exportTools.visible {
+    display: flex;
+  }
+
+  #exportTools button {
+    height: 44px;
+    padding: 0 18px;
+    border-radius: 5px;
+    border: 1px solid #aeb7c1;
+    background: #ffffff;
+    color: #263b52;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  #exportTools button:hover {
+    background: #f2f4f6;
+  }
+
+  #pdfHelp {
+    display: none;
+    max-width: 1400px;
+    margin: -12px auto 20px auto;
+    padding: 12px 28px;
+    color: #444;
+    font-size: 0.9rem;
+  }
+
+  #pdfHelp.visible {
+    display: block;
+  }
+
+
+  /* PRINT / PDF LAYOUT */
+
+  @media print {
+
+    body {
+      background: #ffffff !important;
+      color: #000000 !important;
+    }
+
+    main {
+      max-width: none !important;
+      padding: 0 !important;
+    }
+
+    .search-grid,
+    .search-note,
+    .person-choices,
+    #exportTools,
+    #pdfHelp,
+    footer {
+      display: none !important;
+    }
+
+    .search-panel {
+      border: none !important;
+      box-shadow: none !important;
+      padding: 0 0 18px 0 !important;
+      margin: 0 !important;
+    }
+
+    .status {
+      display: none !important;
+    }
+
+    .person-summary {
+      border: 1px solid #999 !important;
+      border-left: 4px solid #333 !important;
+      background: #ffffff !important;
+      color: #000000 !important;
+      margin: 15px 0 !important;
+    }
+
+    .results {
+      border: none !important;
+      box-shadow: none !important;
+    }
+
+    .table-wrap {
+      overflow: visible !important;
+    }
+
+    table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      font-size: 10pt !important;
+    }
+
+    thead {
+      background: #ffffff !important;
+      color: #000000 !important;
+    }
+
+    th {
+      color: #000000 !important;
+      background: #eeeeee !important;
+      border: 1px solid #777 !important;
+      padding: 7px !important;
+    }
+
+    td {
+      color: #000000 !important;
+      background: #ffffff !important;
+      border: 1px solid #999 !important;
+      padding: 7px !important;
+    }
+
+    tbody tr {
+      background: #ffffff !important;
+    }
+
+    header {
+      border-bottom: 2px solid #333 !important;
+      margin-bottom: 18px !important;
+    }
+
+    header .inner {
+      max-width: none !important;
+      padding: 0 0 15px 0 !important;
+    }
+
+    header .logo {
+      width: 300px !important;
+      max-width: 300px !important;
+      height: auto !important;
+    }
+
+    .title {
+      color: #000000 !important;
+    }
+
+    .updated-date {
+      color: #444 !important;
+    }
+  }
+
+
+  @media (max-width: 600px) {
+
+    #exportTools {
+      padding: 0 16px;
+    }
+
+    #exportTools button {
+      flex: 1 1 100%;
+    }
+  }
+
+</style>
+
+
+<div id="exportTools">
+
+  <button
+    id="exportPrintBtn"
+    type="button"
+  >
+    Print
+  </button>
+
+  <button
+    id="exportPdfBtn"
+    type="button"
+  >
+    Save as PDF
+  </button>
+
+  <button
+    id="exportCsvBtn"
+    type="button"
+  >
+    Save as CSV (Excel)
+  </button>
+
+</div>
+
+
+<div id="pdfHelp">
+  In the print window, choose
+  <strong>Save as PDF</strong>
+  as the destination.
+</div>
+
+
+<script>
+
+(function () {
+
+  const exportTools =
+    document.getElementById("exportTools");
+
+  const printBtn =
+    document.getElementById("exportPrintBtn");
+
+  const pdfBtn =
+    document.getElementById("exportPdfBtn");
+
+  const csvBtn =
+    document.getElementById("exportCsvBtn");
+
+  const pdfHelp =
+    document.getElementById("pdfHelp");
+
+  const resultsBody =
+    document.getElementById("body");
+
+  const resultsHead =
+    document.getElementById("head");
+
+
+  function updateExportTools() {
+
+    const hasResults =
+      resultsBody &&
+      resultsBody.querySelectorAll("tr").length > 0;
+
+    if (hasResults) {
+
+      exportTools.classList.add("visible");
+
+    } else {
+
+      exportTools.classList.remove("visible");
+      pdfHelp.classList.remove("visible");
+    }
+  }
+
+
+  if (resultsBody) {
+
+    const observer =
+      new MutationObserver(updateExportTools);
+
+    observer.observe(
+      resultsBody,
+      {
+        childList: true,
+        subtree: true
+      }
+    );
+
+    updateExportTools();
+  }
+
+
+  /* PRINT */
+
+  printBtn.addEventListener(
+    "click",
+    function () {
+
+      pdfHelp.classList.remove("visible");
+
+      window.print();
+    }
+  );
+
+
+  /* SAVE AS PDF */
+
+  pdfBtn.addEventListener(
+    "click",
+    function () {
+
+      pdfHelp.classList.add("visible");
+
+      window.print();
+    }
+  );
+
+
+  /* CSV HELPERS */
+
+  function csvEscape(value) {
+
+    const text =
+      String(
+        value == null
+          ? ""
+          : value
+      );
+
+    return (
+      '"' +
+      text.replace(/"/g, '""') +
+      '"'
+    );
+  }
+
+
+  function getDisplayedTableData() {
+
+    const rows = [];
+
+    const headerCells =
+      resultsHead.querySelectorAll("th");
+
+    const headers =
+      Array.from(headerCells).map(
+        cell =>
+          cell.textContent.trim()
+      );
+
+    rows.push(headers);
+
+
+    const tableRows =
+      resultsBody.querySelectorAll("tr");
+
+    tableRows.forEach(row => {
+
+      const cells =
+        row.querySelectorAll("td");
+
+      const values =
+        Array.from(cells).map(
+          cell =>
+            cell.textContent.trim()
+        );
+
+      rows.push(values);
+    });
+
+    return rows;
+  }
+
+
+  function makeFilename() {
+
+    const searchInput =
+      document.getElementById("search");
+
+    const yearSelect =
+      document.getElementById("year");
+
+    const semesterSelect =
+      document.getElementById("semester");
+
+    let name =
+      "CTL_Participation";
+
+
+    if (
+      searchInput &&
+      searchInput.value.trim()
+    ) {
+
+      name += "_" +
+        searchInput.value
+          .trim()
+          .replace(
+            /[^a-z0-9]+/gi,
+            "_"
+          )
+          .replace(
+            /^_+|_+$/g,
+            ""
+          );
+    }
+
+
+    if (
+      yearSelect &&
+      yearSelect.value
+    ) {
+
+      name += "_" +
+        yearSelect.value
+          .replace(
+            /[^a-z0-9]+/gi,
+            "_"
+          );
+    }
+
+
+    if (
+      semesterSelect &&
+      semesterSelect.value
+    ) {
+
+      name += "_" +
+        semesterSelect.value
+          .replace(
+            /[^a-z0-9]+/gi,
+            "_"
+          );
+    }
+
+
+    return name + ".csv";
+  }
+
+
+  /* SAVE AS CSV */
+
+  csvBtn.addEventListener(
+    "click",
+    function () {
+
+      const rows =
+        getDisplayedTableData();
+
+      if (rows.length <= 1) {
+        return;
+      }
+
+
+      const csv =
+        "\uFEFF" +
+        rows
+          .map(row =>
+            row
+              .map(csvEscape)
+              .join(",")
+          )
+          .join("\r\n");
+
+
+      const blob =
+        new Blob(
+          [csv],
+          {
+            type:
+              "text/csv;charset=utf-8;"
+          }
+        );
+
+
+      const url =
+        URL.createObjectURL(blob);
+
+
+      const link =
+        document.createElement("a");
+
+      link.href = url;
+
+      link.download =
+        makeFilename();
+
+
+      document.body.appendChild(link);
+
+      link.click();
+
+      document.body.removeChild(link);
+
+      URL.revokeObjectURL(url);
+    }
+  );
+
+})();
+
+</script>
 
 </body>
 </html>
