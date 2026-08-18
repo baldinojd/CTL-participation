@@ -2,6 +2,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   const searchInput = document.getElementById("search");
   const yearSelect = document.getElementById("year");
+  const semesterSelect = document.getElementById("semester");
   const typeSelect = document.getElementById("type");
   const searchBtn = document.getElementById("searchBtn");
   const clearBtn = document.getElementById("clearBtn");
@@ -10,8 +11,11 @@ document.addEventListener("DOMContentLoaded", async function () {
   const body = document.getElementById("body");
   const empty = document.getElementById("empty");
   const updatedDate = document.getElementById("updatedDate");
+  const personChoices = document.getElementById("personChoices");
+  const personSummary = document.getElementById("personSummary");
 
   let events = [];
+  let selectedPerson = "";
 
   function normalize(value) {
     return String(value || "")
@@ -120,14 +124,20 @@ document.addEventListener("DOMContentLoaded", async function () {
   }
 
   function populateFilters() {
+
     yearSelect.innerHTML =
       '<option value="">All years</option>';
+
+    semesterSelect.innerHTML =
+      '<option value="">All semesters</option>';
 
     typeSelect.innerHTML =
       '<option value="">All event types</option>';
 
     const years = [...new Set(
-      events.map(event => event.academicYear)
+      events
+        .map(event => event.academicYear)
+        .filter(Boolean)
     )].sort();
 
     years.forEach(year => {
@@ -136,6 +146,41 @@ document.addEventListener("DOMContentLoaded", async function () {
       option.textContent = year;
       yearSelect.appendChild(option);
     });
+
+    const preferredSemesters = [
+      "Fall",
+      "Intersession",
+      "Spring",
+      "Summer I",
+      "Summer II"
+    ];
+
+    const availableSemesters = [...new Set(
+      events
+        .map(event => event.semester)
+        .filter(Boolean)
+    )];
+
+    preferredSemesters.forEach(semester => {
+      if (availableSemesters.includes(semester)) {
+        const option = document.createElement("option");
+        option.value = semester;
+        option.textContent = semester;
+        semesterSelect.appendChild(option);
+      }
+    });
+
+    availableSemesters
+      .filter(semester =>
+        !preferredSemesters.includes(semester)
+      )
+      .sort()
+      .forEach(semester => {
+        const option = document.createElement("option");
+        option.value = semester;
+        option.textContent = semester;
+        semesterSelect.appendChild(option);
+      });
 
     const preferredTypes = [
       "Roundtable",
@@ -146,7 +191,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     ];
 
     const availableTypes = [...new Set(
-      events.map(event => event.type)
+      events
+        .map(event => event.type)
+        .filter(Boolean)
     )];
 
     preferredTypes.forEach(type => {
@@ -157,9 +204,48 @@ document.addEventListener("DOMContentLoaded", async function () {
         typeSelect.appendChild(option);
       }
     });
+
+    availableTypes
+      .filter(type =>
+        !preferredTypes.includes(type)
+      )
+      .sort()
+      .forEach(type => {
+        const option = document.createElement("option");
+        option.value = type;
+        option.textContent = type;
+        typeSelect.appendChild(option);
+      });
   }
 
-  function matchesPerson(name, query) {
+  function getAllPeople() {
+    const people = new Map();
+
+    events.forEach(event => {
+
+      if (event.facilitator) {
+        const key = normalize(event.facilitator);
+
+        if (!people.has(key)) {
+          people.set(key, event.facilitator);
+        }
+      }
+
+      event.participants.forEach(person => {
+        const key = normalize(person);
+
+        if (!people.has(key)) {
+          people.set(key, person);
+        }
+      });
+    });
+
+    return [...people.values()].sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }
+
+  function personMatchesQuery(name, query) {
     const normalizedName = normalize(name);
     const normalizedQuery = normalize(query);
 
@@ -175,41 +261,51 @@ document.addEventListener("DOMContentLoaded", async function () {
   }
 
   function findMatchingPeople(query) {
-    const people = new Set();
-
-    events.forEach(event => {
-      if (event.facilitator) {
-        people.add(event.facilitator);
-      }
-
-      event.participants.forEach(person => {
-        people.add(person);
-      });
-    });
-
-    return [...people].filter(person =>
-      matchesPerson(person, query)
+    return getAllPeople().filter(person =>
+      personMatchesQuery(person, query)
     );
   }
 
-  function isPersonSearch(query) {
-    if (!query.trim()) {
-      return false;
-    }
-
-    return findMatchingPeople(query).length > 0;
+  function exactPersonMatch(name, selectedName) {
+    return normalize(name) === normalize(selectedName);
   }
 
-  function eventMatchesPerson(event, query) {
+  function eventIncludesPerson(event, person) {
+
     if (
       event.facilitator &&
-      matchesPerson(event.facilitator, query)
+      exactPersonMatch(event.facilitator, person)
     ) {
       return true;
     }
 
-    return event.participants.some(person =>
-      matchesPerson(person, query)
+    return event.participants.some(participant =>
+      exactPersonMatch(participant, person)
+    );
+  }
+
+  function passesFilters(event) {
+
+    const selectedYear = yearSelect.value;
+    const selectedSemester = semesterSelect.value;
+    const selectedType = typeSelect.value;
+
+    const yearMatch =
+      !selectedYear ||
+      event.academicYear === selectedYear;
+
+    const semesterMatch =
+      !selectedSemester ||
+      event.semester === selectedSemester;
+
+    const typeMatch =
+      !selectedType ||
+      event.type === selectedType;
+
+    return (
+      yearMatch &&
+      semesterMatch &&
+      typeMatch
     );
   }
 
@@ -275,7 +371,106 @@ document.addEventListener("DOMContentLoaded", async function () {
     `;
   }
 
+  function hidePersonChoices() {
+    personChoices.innerHTML = "";
+    personChoices.style.display = "none";
+  }
+
+  function hidePersonSummary() {
+    personSummary.innerHTML = "";
+    personSummary.style.display = "none";
+  }
+
+  function displayPersonChoices(query, people) {
+
+    selectedPerson = "";
+    hidePersonSummary();
+
+    personChoices.innerHTML = "";
+
+    const message = document.createElement("div");
+    message.className = "person-choice-message";
+
+    message.textContent =
+      'Multiple people match "' +
+      query +
+      '". Please select the person you want:';
+
+    personChoices.appendChild(message);
+
+    const buttons = document.createElement("div");
+    buttons.className = "person-choice-buttons";
+
+    people.forEach(person => {
+
+      const button = document.createElement("button");
+
+      button.type = "button";
+      button.className = "person-choice-button";
+
+      /*
+        Names are stored in the CSV as Last, First.
+        Display them as First Last for readability.
+      */
+
+      if (person.includes(",")) {
+        const parts = person.split(",");
+
+        button.textContent =
+          parts.slice(1).join(",").trim() +
+          " " +
+          parts[0].trim();
+      } else {
+        button.textContent = person;
+      }
+
+      button.addEventListener("click", function () {
+        selectedPerson = person;
+        hidePersonChoices();
+        runPersonSearch(person);
+      });
+
+      buttons.appendChild(button);
+    });
+
+    personChoices.appendChild(buttons);
+    personChoices.style.display = "block";
+
+    body.innerHTML = "";
+    setPersonHeader();
+
+    empty.style.display = "none";
+
+    status.textContent =
+      "Select a person to view participation.";
+  }
+
+  function displayPersonSummary(person, total) {
+
+    let displayName = person;
+
+    if (person.includes(",")) {
+      const parts = person.split(",");
+
+      displayName =
+        parts.slice(1).join(",").trim() +
+        " " +
+        parts[0].trim();
+    }
+
+    personSummary.innerHTML =
+      "<strong>" +
+      displayName +
+      "</strong>" +
+      " &nbsp;|&nbsp; " +
+      "<strong>Total Sessions Attended:</strong> " +
+      total;
+
+    personSummary.style.display = "block";
+  }
+
   function renderResults(results, personMode) {
+
     body.innerHTML = "";
 
     if (personMode) {
@@ -286,14 +481,17 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     if (results.length === 0) {
       empty.style.display = "block";
+
       status.textContent =
         "No matching participation records.";
+
       return;
     }
 
     empty.style.display = "none";
 
     results.forEach(event => {
+
       const row = document.createElement("tr");
 
       row.appendChild(
@@ -317,12 +515,18 @@ document.addEventListener("DOMContentLoaded", async function () {
       );
 
       if (!personMode) {
+
         row.appendChild(
-          createCell(event.participants.join(", "))
+          createCell(
+            event.participants.join(", ")
+          )
         );
 
         row.appendChild(
-          createCell(String(event.total), "total")
+          createCell(
+            String(event.total),
+            "total"
+          )
         );
       }
 
@@ -332,58 +536,133 @@ document.addEventListener("DOMContentLoaded", async function () {
     status.textContent =
       "Showing " +
       results.length +
-      (results.length === 1
-        ? " matching event."
-        : " matching events.");
+      (
+        results.length === 1
+          ? " matching event."
+          : " matching events."
+      );
+  }
+
+  function runPersonSearch(person) {
+
+    selectedPerson = person;
+
+    const results = events.filter(event =>
+      passesFilters(event) &&
+      eventIncludesPerson(event, person)
+    );
+
+    hidePersonChoices();
+
+    displayPersonSummary(
+      person,
+      results.length
+    );
+
+    renderResults(
+      results,
+      true
+    );
+  }
+
+  function runGeneralSearch(query) {
+
+    selectedPerson = "";
+
+    hidePersonChoices();
+    hidePersonSummary();
+
+    const results = events.filter(event =>
+      passesFilters(event) &&
+      eventMatchesGeneralSearch(event, query)
+    );
+
+    renderResults(
+      results,
+      false
+    );
   }
 
   function runSearch() {
+
     const query = searchInput.value.trim();
-    const selectedYear = yearSelect.value;
-    const selectedType = typeSelect.value;
 
-    const personMode = isPersonSearch(query);
+    /*
+      If a specific person was already selected,
+      preserve that selection when the user changes
+      AY, Semester, or Event Type.
+    */
 
-    const results = events.filter(event => {
-      const yearMatch =
-        !selectedYear ||
-        event.academicYear === selectedYear;
+    if (selectedPerson) {
+      runPersonSearch(selectedPerson);
+      return;
+    }
 
-      const typeMatch =
-        !selectedType ||
-        event.type === selectedType;
+    if (!query) {
+      runGeneralSearch("");
+      return;
+    }
 
-      let searchMatch = true;
+    const matchingPeople =
+      findMatchingPeople(query);
 
-      if (query) {
-        if (personMode) {
-          searchMatch =
-            eventMatchesPerson(event, query);
-        } else {
-          searchMatch =
-            eventMatchesGeneralSearch(event, query);
-        }
-      }
+    if (matchingPeople.length === 1) {
 
-      return (
-        yearMatch &&
-        typeMatch &&
-        searchMatch
+      selectedPerson = matchingPeople[0];
+
+      runPersonSearch(
+        matchingPeople[0]
       );
-    });
 
-    renderResults(results, personMode);
+      return;
+    }
+
+    if (matchingPeople.length > 1) {
+
+      displayPersonChoices(
+        query,
+        matchingPeople
+      );
+
+      return;
+    }
+
+    runGeneralSearch(query);
   }
 
   function clearSearch() {
+
     searchInput.value = "";
     yearSelect.value = "";
+    semesterSelect.value = "";
     typeSelect.value = "";
 
-    renderResults(events, false);
+    selectedPerson = "";
+
+    hidePersonChoices();
+    hidePersonSummary();
+
+    renderResults(
+      events,
+      false
+    );
 
     searchInput.focus();
   }
+
+  /*
+    If the user changes the text after selecting
+    a person, remove the old person selection.
+  */
+
+  searchInput.addEventListener(
+    "input",
+    function () {
+      selectedPerson = "";
+      hidePersonChoices();
+      hidePersonSummary();
+    }
+  );
 
   searchBtn.addEventListener(
     "click",
@@ -393,6 +672,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   searchInput.addEventListener(
     "keydown",
     function (event) {
+
       if (event.key === "Enter") {
         event.preventDefault();
         runSearch();
@@ -401,6 +681,11 @@ document.addEventListener("DOMContentLoaded", async function () {
   );
 
   yearSelect.addEventListener(
+    "change",
+    runSearch
+  );
+
+  semesterSelect.addEventListener(
     "change",
     runSearch
   );
@@ -416,6 +701,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   );
 
   try {
+
     const response = await fetch(
       "CTL_Participation_Master.csv",
       {
@@ -438,6 +724,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     events = data.events;
 
     if (updatedDate) {
+
       updatedDate.textContent =
         data.updated
           ? "Data updated: " + data.updated
@@ -445,9 +732,14 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 
     populateFilters();
-    renderResults(events, false);
+
+    renderResults(
+      events,
+      false
+    );
 
   } catch (error) {
+
     console.error(error);
 
     status.textContent =
