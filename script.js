@@ -652,7 +652,6 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   searchInput.focus();
 }
-  }
 
   /*
     If the user changes the text after selecting
