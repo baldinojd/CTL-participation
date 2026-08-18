@@ -37,6 +37,11 @@ document.addEventListener("DOMContentLoaded", async function () {
   }
 
 
+  function personKey(person) {
+    return normalize(person);
+  }
+
+
   function displayPersonName(person) {
 
     if (!person) {
@@ -58,11 +63,6 @@ document.addEventListener("DOMContentLoaded", async function () {
   }
 
 
-  function personKey(person) {
-    return normalize(person);
-  }
-
-
   /* =========================================================
      CSV PARSER
      ========================================================= */
@@ -70,6 +70,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   function parseCSV(text) {
 
     const rows = [];
+
     let row = [];
     let field = "";
     let inQuotes = false;
@@ -167,7 +168,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
 
   /* =========================================================
-     GENERAL CTL PARTICIPATION MASTER
+     GENERAL PARTICIPATION MASTER
      ========================================================= */
 
   function loadParticipationCSV(text) {
@@ -328,7 +329,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
 
   /* =========================================================
-     FULL-TIME COHORT SESSION ATTENDANCE
+     FULL-TIME COHORT ATTENDANCE
      ========================================================= */
 
   function loadCohortAttendanceCSV(text) {
@@ -455,9 +456,6 @@ document.addEventListener("DOMContentLoaded", async function () {
           a.localeCompare(b)
       );
 
-      /*
-        Total participation includes facilitator.
-      */
       event.total =
         event.participants.length + 1;
     });
@@ -467,7 +465,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
 
   /* =========================================================
-     EARLIER FULL-TIME COHORT ROSTERS
+     EARLIER FT COHORT ROSTERS
      ========================================================= */
 
   function buildCohortRosterEvents(
@@ -517,12 +515,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     rosters.forEach(
       (people, year) => {
 
-        /*
-          Do not create roster-only records
-          for AYs where actual session-level
-          attendance exists.
-        */
-
         if (
           detailedYears.has(year)
         ) {
@@ -540,7 +532,8 @@ document.addEventListener("DOMContentLoaded", async function () {
 
           semester: "",
 
-          academicYear: year,
+          academicYear:
+            year,
 
           topic:
             "Full-Time Cohort: AY " +
@@ -562,10 +555,6 @@ document.addEventListener("DOMContentLoaded", async function () {
           source:
             "Full-Time Cohort Roster",
 
-          /*
-            Membership only.
-            Not a documented session.
-          */
           rosterOnly:
             true
         });
@@ -593,22 +582,13 @@ document.addEventListener("DOMContentLoaded", async function () {
     const index = {
       ay: headers.indexOf("AY"),
       semester: headers.indexOf("Semester"),
-      type: headers.indexOf("Type"),
       program: headers.indexOf("Program"),
       facilitator: headers.indexOf("Facilitator"),
       participant: headers.indexOf("Participant")
     };
 
-    /*
-      One event-style record per
-      AY + Semester + Program.
-
-      This represents completion of the
-      training program, not a fabricated
-      individual calendar date.
-    */
-
-    const groups = new Map();
+    const groups =
+      new Map();
 
     rows
       .slice(1)
@@ -660,16 +640,9 @@ document.addEventListener("DOMContentLoaded", async function () {
               facilitator: facilitator,
               participants: [],
               total: 0,
-
-              /*
-                Keep Adjunct and FT distinct
-                in the Event Type filter.
-              */
               type: program,
-
               source:
                 "Instructor Readiness Training",
-
               rosterOnly: false
             }
           );
@@ -776,14 +749,23 @@ document.addEventListener("DOMContentLoaded", async function () {
   }
 
 
+  /*
+    Supplemental Office Hours are grouped by
+    AY + Semester so they display like the
+    existing master Office Hours records.
+  */
+
   function loadOfficeHoursCSV(
     text,
     participationEvents
   ) {
 
-    const rows = parseCSV(text);
+    const rows =
+      parseCSV(text);
 
-    if (rows.length < 2) {
+    if (
+      rows.length < 2
+    ) {
       return [];
     }
 
@@ -791,27 +773,26 @@ document.addEventListener("DOMContentLoaded", async function () {
       getHeaders(rows);
 
     const index = {
-      ay: headers.indexOf("AY"),
-      semester: headers.indexOf("Semester"),
-      program: headers.indexOf("Program"),
-      facilitator: headers.indexOf("Facilitator"),
-      participant: headers.indexOf("Participant")
+      ay:
+        headers.indexOf("AY"),
+      semester:
+        headers.indexOf("Semester"),
+      facilitator:
+        headers.indexOf("Facilitator"),
+      participant:
+        headers.indexOf("Participant")
     };
 
-    /*
-      Office Hours already present in the
-      master must not be counted twice.
-    */
 
     const existingMasterPeople =
       getMasterOfficeHoursPeople(
         participationEvents
       );
 
-    const addedPeople =
-      new Set();
 
-    const officeEvents = [];
+    const grouped =
+      new Map();
+
 
     rows
       .slice(1)
@@ -830,6 +811,7 @@ document.addEventListener("DOMContentLoaded", async function () {
           (row[index.facilitator] || "").trim()
           || OFFICE_HOURS_FACILITATOR;
 
+
         if (
           !ay ||
           !semester ||
@@ -838,77 +820,111 @@ document.addEventListener("DOMContentLoaded", async function () {
           return;
         }
 
-        const key =
+
+        /*
+          Do not add someone already represented
+          in the master Office Hours data for the
+          same AY and semester.
+        */
+
+        const personSemesterKey =
           makeOfficeHoursPersonKey(
             ay,
             semester,
             participant
           );
 
-        /*
-          Skip if already represented in
-          the participation master.
-        */
 
         if (
-          existingMasterPeople.has(key)
+          existingMasterPeople.has(
+            personSemesterKey
+          )
         ) {
           return;
         }
 
-        /*
-          Also protect against duplicates
-          within the supplemental CSV.
-        */
 
-        if (
-          addedPeople.has(key)
-        ) {
-          return;
-        }
-
-        addedPeople.add(key);
-
-        /*
-          One supplied name represents one
-          documented Office Hours participation.
-          No date is invented.
-        */
-
-        officeEvents.push({
-
-          date: "",
-
-          semester:
-            semester,
-
-          academicYear:
+        const groupKey =
+          [
             ay,
+            semester
+          ].join("|||");
 
-          topic:
-            "Office Hours",
 
-          facilitator:
-            facilitator,
+        if (
+          !grouped.has(
+            groupKey
+          )
+        ) {
 
-          participants:
-            [participant],
+          grouped.set(
+            groupKey,
+            {
+              date: "",
+              semester: semester,
+              academicYear: ay,
+              topic: "Office Hours",
+              facilitator: facilitator,
+              participants: [],
+              total: 0,
+              type: "Office Hours",
+              source:
+                "Office Hours Supplemental",
+              rosterOnly: false
+            }
+          );
+        }
 
-          /*
-            Participant + facilitator.
-          */
-          total: 2,
 
-          type:
-            "Office Hours",
+        const event =
+          grouped.get(
+            groupKey
+          );
 
-          source:
-            "Office Hours Supplemental",
 
-          rosterOnly:
-            false
-        });
+        const alreadyPresent =
+          event.participants.some(
+            existing =>
+              personKey(existing) ===
+              personKey(participant)
+          );
+
+
+        if (
+          !alreadyPresent
+        ) {
+
+          event.participants.push(
+            participant
+          );
+        }
       });
+
+
+    const officeEvents =
+      Array.from(
+        grouped.values()
+      );
+
+
+    officeEvents.forEach(
+      event => {
+
+        event.participants.sort(
+          (a, b) =>
+            a.localeCompare(b)
+        );
+
+
+        /*
+          Total = participants + facilitator.
+        */
+
+        event.total =
+          event.participants.length + 1;
+      }
+    );
+
 
     return officeEvents;
   }
@@ -1032,25 +1048,23 @@ document.addEventListener("DOMContentLoaded", async function () {
           )
       )
       .sort()
-      .forEach(
-        semester => {
+      .forEach(semester => {
 
-          const option =
-            document.createElement(
-              "option"
-            );
-
-          option.value =
-            semester;
-
-          option.textContent =
-            semester;
-
-          semesterSelect.appendChild(
-            option
+        const option =
+          document.createElement(
+            "option"
           );
-        }
-      );
+
+        option.value =
+          semester;
+
+        option.textContent =
+          semester;
+
+        semesterSelect.appendChild(
+          option
+        );
+      });
 
 
     const preferredTypes = [
@@ -1144,6 +1158,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     const people =
       new Map();
 
+
     events.forEach(event => {
 
       if (
@@ -1165,6 +1180,7 @@ document.addEventListener("DOMContentLoaded", async function () {
           );
         }
       }
+
 
       event.participants.forEach(
         person => {
@@ -1568,6 +1584,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       "<strong>Total Sessions Attended:</strong> " +
       total;
 
+
     if (
       cohortYears.length
     ) {
@@ -1585,6 +1602,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         "<strong>Full-Time Cohort:</strong> " +
         cohortText;
     }
+
 
     personSummary.innerHTML =
       html;
@@ -1682,7 +1700,9 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         row.appendChild(
           createCell(
-            String(event.total),
+            String(
+              event.total
+            ),
             "total"
           )
         );
@@ -1712,12 +1732,6 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     selectedPerson =
       person;
-
-    /*
-      FT roster-only records are membership,
-      not sessions, so they do not count toward
-      Total Sessions Attended.
-    */
 
     const results =
       events.filter(
@@ -1776,6 +1790,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     const query =
       searchInput.value.trim();
 
+
     if (
       selectedPerson
     ) {
@@ -1787,6 +1802,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       return;
     }
 
+
     if (
       !query
     ) {
@@ -1795,6 +1811,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         yearSelect.value ||
         semesterSelect.value ||
         typeSelect.value;
+
 
       if (
         hasFilter
@@ -1824,10 +1841,12 @@ document.addEventListener("DOMContentLoaded", async function () {
       return;
     }
 
+
     const matchingPeople =
       findMatchingPeople(
         query
       );
+
 
     if (
       matchingPeople.length === 1
@@ -1843,6 +1862,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       return;
     }
 
+
     if (
       matchingPeople.length > 1
     ) {
@@ -1854,6 +1874,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
       return;
     }
+
 
     runGeneralSearch(
       query
@@ -1981,35 +2002,40 @@ document.addEventListener("DOMContentLoaded", async function () {
       fetch(
         "CTL_Participation_Master.csv",
         {
-          cache: "no-store"
+          cache:
+            "no-store"
         }
       ),
 
       fetch(
         "CTL_Full_Time_Cohort.csv",
         {
-          cache: "no-store"
+          cache:
+            "no-store"
         }
       ),
 
       fetch(
         "CTL_Full_Time_Cohort_Attendance.csv",
         {
-          cache: "no-store"
+          cache:
+            "no-store"
         }
       ),
 
       fetch(
         "CTL_Instructor_Readiness_Training.csv",
         {
-          cache: "no-store"
+          cache:
+            "no-store"
         }
       ),
 
       fetch(
         "CTL_Office_Hours.csv",
         {
-          cache: "no-store"
+          cache:
+            "no-store"
         }
       )
 
@@ -2024,6 +2050,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       );
     }
 
+
     if (
       !membershipResponse.ok
     ) {
@@ -2031,6 +2058,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         "Full-Time Cohort membership data could not be loaded."
       );
     }
+
 
     if (
       !cohortAttendanceResponse.ok
@@ -2040,6 +2068,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       );
     }
 
+
     if (
       !irtResponse.ok
     ) {
@@ -2047,6 +2076,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         "Instructor Readiness Training data could not be loaded."
       );
     }
+
 
     if (
       !officeHoursResponse.ok
@@ -2073,11 +2103,6 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     ]);
 
-
-    /*
-      Membership first because the FT roster
-      records depend on it.
-    */
 
     loadCohortMembershipCSV(
       membershipText
@@ -2108,22 +2133,12 @@ document.addEventListener("DOMContentLoaded", async function () {
       );
 
 
-    /*
-      Office Hours supplemental records are
-      compared against the participation master
-      before being added.
-    */
-
     const officeHoursEvents =
       loadOfficeHoursCSV(
         officeHoursText,
         participationData.events
       );
 
-
-    /*
-      Combined searchable data.
-    */
 
     events = [
       ...participationData.events,
@@ -2148,10 +2163,6 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     populateFilters();
 
-
-    /*
-      Blank initial state.
-    */
 
     body.innerHTML =
       "";
