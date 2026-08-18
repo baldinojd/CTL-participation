@@ -14,6 +14,8 @@ document.addEventListener("DOMContentLoaded", async function () {
   const personChoices = document.getElementById("personChoices");
   const personSummary = document.getElementById("personSummary");
 
+  const FT_COHORT_FACILITATOR = "Baldino, John";
+
   let events = [];
   let selectedPerson = "";
 
@@ -515,14 +517,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     };
 
 
-    /*
-      Convert person/session attendance rows
-      into event-style records.
-
-      Session identity is based on:
-      AY + Semester + Date + Session Title.
-    */
-
     const groupedSessions =
       new Map();
 
@@ -618,17 +612,38 @@ document.addEventListener("DOMContentLoaded", async function () {
             groupedSessions.set(
               key,
               {
-                date: date,
-                semester: semester,
-                academicYear: ay,
-                topic: title,
-                facilitator: "",
-                participants: [],
-                total: 0,
+                date:
+                  date,
+
+                semester:
+                  semester,
+
+                academicYear:
+                  ay,
+
+                topic:
+                  title,
+
+                /*
+                  All documented FT Cohort
+                  sessions are facilitated
+                  by John Baldino.
+                */
+                facilitator:
+                  FT_COHORT_FACILITATOR,
+
+                participants:
+                  [],
+
+                total:
+                  0,
+
                 type:
                   "Full-Time Cohort",
+
                 source:
                   "Full-Time Cohort",
+
                 rosterOnly:
                   false
               }
@@ -639,13 +654,11 @@ document.addEventListener("DOMContentLoaded", async function () {
           /*
             Only affirmative attendance is
             added to the participant list.
-
-            This preserves documented absences,
-            including Allison Mayer's two
-            exceptions.
           */
 
-          if (didAttend) {
+          if (
+            didAttend
+          ) {
 
             const session =
               groupedSessions.get(
@@ -692,6 +705,7 @@ document.addEventListener("DOMContentLoaded", async function () {
             a.localeCompare(b)
         );
 
+
         event.total =
           event.participants.length;
       }
@@ -727,8 +741,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
 
     /*
-      Build AY -> cohort roster from the
-      membership CSV.
+      Build AY -> roster from membership data.
     */
 
     const rosters =
@@ -765,7 +778,8 @@ document.addEventListener("DOMContentLoaded", async function () {
     );
 
 
-    const rosterEvents = [];
+    const rosterEvents =
+      [];
 
 
     rosters.forEach(
@@ -775,8 +789,8 @@ document.addEventListener("DOMContentLoaded", async function () {
       ) => {
 
         /*
-          If we already have documented
-          session-level records for this AY,
+          If documented individual session
+          records already exist for the AY,
           do not create a roster-only result.
         */
 
@@ -797,9 +811,11 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         rosterEvents.push({
 
-          date: "",
+          date:
+            "",
 
-          semester: "",
+          semester:
+            "",
 
           academicYear:
             year,
@@ -809,7 +825,13 @@ document.addEventListener("DOMContentLoaded", async function () {
             year +
             " Roster",
 
-          facilitator: "",
+          /*
+            The program is facilitated by
+            John Baldino even in years where
+            only roster information survives.
+          */
+          facilitator:
+            FT_COHORT_FACILITATOR,
 
           participants:
             people,
@@ -824,9 +846,8 @@ document.addEventListener("DOMContentLoaded", async function () {
             "Full-Time Cohort Roster",
 
           /*
-            Important:
-            this is membership information,
-            NOT a session attended.
+            This is membership information,
+            NOT a documented session.
           */
           rosterOnly:
             true
@@ -856,15 +877,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     typeSelect.innerHTML =
       '<option value="">All event types</option>';
 
-
-    /*
-      AY values come from BOTH event records
-      and cohort membership.
-
-      This allows earlier cohort years to
-      remain searchable even though we do not
-      have session-level attendance for them.
-    */
 
     const yearSet =
       new Set(
@@ -906,11 +918,14 @@ document.addEventListener("DOMContentLoaded", async function () {
             "option"
           );
 
+
         option.value =
           year;
 
+
         option.textContent =
           year;
+
 
         yearSelect.appendChild(
           option
@@ -955,11 +970,14 @@ document.addEventListener("DOMContentLoaded", async function () {
               "option"
             );
 
+
           option.value =
             semester;
 
+
           option.textContent =
             semester;
+
 
           semesterSelect.appendChild(
             option
@@ -985,11 +1003,14 @@ document.addEventListener("DOMContentLoaded", async function () {
               "option"
             );
 
+
           option.value =
             semester;
 
+
           option.textContent =
             semester;
+
 
           semesterSelect.appendChild(
             option
@@ -1036,11 +1057,14 @@ document.addEventListener("DOMContentLoaded", async function () {
               "option"
             );
 
+
           option.value =
             type;
 
+
           option.textContent =
             type;
+
 
           typeSelect.appendChild(
             option
@@ -1066,11 +1090,14 @@ document.addEventListener("DOMContentLoaded", async function () {
               "option"
             );
 
+
           option.value =
             type;
 
+
           option.textContent =
             type;
+
 
           typeSelect.appendChild(
             option
@@ -1143,12 +1170,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     );
 
 
-    /*
-      Include every cohort member, including
-      people whose AY predates the documented
-      session-attendance dataset.
-    */
-
     cohortMembership.forEach(
       record => {
 
@@ -1188,11 +1209,15 @@ document.addEventListener("DOMContentLoaded", async function () {
   ) {
 
     const normalizedName =
-      normalize(name);
+      normalize(
+        name
+      );
 
 
     const normalizedQuery =
-      normalize(query);
+      normalize(
+        query
+      );
 
 
     if (
@@ -1237,7 +1262,9 @@ document.addEventListener("DOMContentLoaded", async function () {
   ) {
 
     return (
-      normalize(name) ===
+      normalize(
+        name
+      ) ===
       normalize(
         selectedName
       )
@@ -1297,15 +1324,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         selectedYear;
 
 
-    /*
-      Roster-only records have no semester
-      because we only know AY membership.
-
-      If the user selects a semester, roster-only
-      records are therefore excluded rather than
-      implying Fall/Spring membership.
-    */
-
     const semesterMatch =
       !selectedSemester ||
       event.semester ===
@@ -1337,7 +1355,9 @@ document.addEventListener("DOMContentLoaded", async function () {
       );
 
 
-    if (!q) {
+    if (
+      !q
+    ) {
       return true;
     }
 
@@ -1441,6 +1461,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     personChoices.innerHTML =
       "";
 
+
     personChoices.style.display =
       "none";
   }
@@ -1450,6 +1471,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     personSummary.innerHTML =
       "";
+
 
     personSummary.style.display =
       "none";
@@ -1610,7 +1632,8 @@ document.addEventListener("DOMContentLoaded", async function () {
         cohortYears
           .map(
             year =>
-              "AY " + year
+              "AY " +
+              year
           )
           .join(", ");
 
@@ -1776,13 +1799,14 @@ document.addEventListener("DOMContentLoaded", async function () {
 
 
     /*
-      Roster-only records are deliberately
-      excluded from a person's attended-session
-      results.
+      Roster-only records are NOT sessions.
 
-      Membership still appears in the summary,
-      but it does NOT increase
-      Total Sessions Attended.
+      Therefore:
+      - they do not appear in a person's
+        attended/facilitated session list;
+      - they do not increase Total Sessions
+        Attended;
+      - actual FT Cohort sessions do.
     */
 
     const results =
@@ -1853,11 +1877,6 @@ document.addEventListener("DOMContentLoaded", async function () {
       searchInput.value.trim();
 
 
-    /*
-      Preserve a selected person's identity
-      when AY, Semester, or Event Type changes.
-    */
-
     if (
       selectedPerson
     ) {
@@ -1870,12 +1889,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 
 
-    /*
-      No text is required if at least one
-      dropdown filter has been selected.
-    */
-
-    if (!query) {
+    if (
+      !query
+    ) {
 
       const hasFilter =
         yearSelect.value ||
@@ -2159,11 +2175,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     ]);
 
 
-    /*
-      Load membership first because the roster
-      records depend on it.
-    */
-
     loadCohortMembershipCSV(
       membershipText
     );
@@ -2181,23 +2192,11 @@ document.addEventListener("DOMContentLoaded", async function () {
       );
 
 
-    /*
-      Create searchable roster-only records for
-      AYs where membership is documented but
-      session-level attendance is not.
-
-      No sessions are invented.
-    */
-
     const cohortRosterEvents =
       buildCohortRosterEvents(
         cohortEvents
       );
 
-
-    /*
-      Combined searchable dataset.
-    */
 
     events = [
       ...participationData.events,
@@ -2221,10 +2220,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     populateFilters();
 
 
-    /*
-      Blank initial state.
-    */
-
     body.innerHTML =
       "";
 
@@ -2240,7 +2235,9 @@ document.addEventListener("DOMContentLoaded", async function () {
       "Enter a search term or select a filter to begin.";
 
 
-  } catch (error) {
+  } catch (
+    error
+  ) {
 
     console.error(
       error
