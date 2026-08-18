@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
 
   <title>CTL Participation Search</title>
 
@@ -13,96 +16,169 @@
 
   <header>
     <div class="inner">
+
       <img
         class="logo"
         src="ctl-logo.PNG"
         alt="Center for Teaching and Learning, Lackawanna College"
       >
 
-<div class="title">Participation Search</div>
-<div id="updatedDate" class="updated-date">Data updated: —</div>    </div>
+      <div class="title">
+        Participation Search
+      </div>
+
+      <div
+        id="updatedDate"
+        class="updated-date"
+      >
+        Data updated: —
+      </div>
+
+    </div>
   </header>
 
   <main>
 
-    <section class="searchbox">
+    <section class="search-panel">
 
-      <div class="controls">
+      <div class="search-grid">
 
-        <div class="searchfield">
-          <label for="search">Search</label>
+        <div class="field search-field">
+          <label for="search">
+            Search
+          </label>
 
           <input
             id="search"
             type="text"
             placeholder="Search by name, topic, keyword, or facilitator"
+            autocomplete="off"
           >
         </div>
 
-        <div>
-          <label for="year">Academic Year</label>
+        <div class="field">
+          <label for="year">
+            Academic Year
+          </label>
 
           <select id="year">
-            <option value="">All years</option>
+            <option value="">
+              All years
+            </option>
           </select>
         </div>
 
-        <div>
-          <label for="type">Event Type</label>
+        <div class="field">
+          <label for="semester">
+            Semester
+          </label>
+
+          <select id="semester">
+            <option value="">
+              All semesters
+            </option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="type">
+            Event Type
+          </label>
 
           <select id="type">
-            <option value="">All event types</option>
+            <option value="">
+              All event types
+            </option>
           </select>
         </div>
 
-        <button type="button" id="searchBtn">
-          Search
-        </button>
+        <div class="button-group">
 
-        <button type="button" id="clearBtn" class="secondary">
-          Clear
-        </button>
+          <button
+            id="searchBtn"
+            type="button"
+            class="primary"
+          >
+            Search
+          </button>
+
+          <button
+            id="clearBtn"
+            type="button"
+            class="secondary"
+          >
+            Clear
+          </button>
+
+        </div>
 
       </div>
 
-      <div id="status">
-        Loading participation records...
+      <div
+        id="personChoices"
+        class="person-choices"
+        style="display: none;"
+      ></div>
+
+      <div
+        id="personSummary"
+        class="person-summary"
+        style="display: none;"
+      ></div>
+
+      <div
+        id="status"
+        class="status"
+      >
+        Loading participation data...
       </div>
 
-      <div class="note">
+      <div class="search-note">
         Person searches accept First Last, Last, First, or Last.
       </div>
 
     </section>
 
+    <section class="results">
 
-    <div class="results-wrap">
+      <div class="table-wrap">
 
-      <table>
+        <table>
 
-        <thead id="head"></thead>
+          <thead id="head">
+            <tr>
+              <th>Date</th>
+              <th>Semester</th>
+              <th>AY</th>
+              <th>Topic</th>
+              <th>Facilitator</th>
+              <th>Participants</th>
+              <th>Total</th>
+            </tr>
+          </thead>
 
-        <tbody id="body"></tbody>
+          <tbody id="body">
+          </tbody>
 
-      </table>
+        </table>
+
+      </div>
 
       <div
         id="empty"
         class="empty"
-        style="display:none"
+        style="display: none;"
       >
-        No matching participation records.
+        No matching participation records found.
       </div>
 
-    </div>
+    </section>
 
   </main>
-
 
   <footer>
     Center for Teaching and Learning · Lackawanna College
   </footer>
-
 
   <script src="script.js"></script>
 
