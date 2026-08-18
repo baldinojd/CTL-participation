@@ -188,15 +188,19 @@
      Print | Save as PDF | Save as CSV (Excel)
      ========================================================= -->
 
+<!-- =========================================================
+     CTL RESULTS EXPORT TOOLS
+     Print | Save as PDF | Save as CSV (Excel)
+     ========================================================= -->
+
 <style>
 
   #exportTools {
     display: none;
-    max-width: 1400px;
-    margin: 0 auto 24px auto;
-    padding: 0 28px;
+    margin-top: 16px;
     gap: 10px;
     flex-wrap: wrap;
+    align-items: center;
   }
 
   #exportTools.visible {
@@ -204,13 +208,13 @@
   }
 
   #exportTools button {
-    height: 44px;
-    padding: 0 18px;
+    height: 40px;
+    padding: 0 16px;
     border-radius: 5px;
     border: 1px solid #aeb7c1;
     background: #ffffff;
     color: #263b52;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 700;
     cursor: pointer;
   }
@@ -219,21 +223,27 @@
     background: #f2f4f6;
   }
 
+  #reportingRange {
+    display: none;
+    margin-top: 14px;
+    font-size: 0.95rem;
+    color: #333333;
+  }
+
+  #reportingRange.visible {
+    display: block;
+  }
+
   #pdfHelp {
     display: none;
-    max-width: 1400px;
-    margin: -12px auto 20px auto;
-    padding: 12px 28px;
-    color: #444;
-    font-size: 0.9rem;
+    margin-top: 10px;
+    color: #555555;
+    font-size: 0.88rem;
   }
 
   #pdfHelp.visible {
     display: block;
   }
-
-
-  /* PRINT / PDF LAYOUT */
 
   @media print {
 
@@ -267,7 +277,15 @@
       display: none !important;
     }
 
+    #reportingRange {
+      display: block !important;
+      margin: 8px 0 14px 0 !important;
+      font-weight: 700 !important;
+      color: #000000 !important;
+    }
+
     .person-summary {
+      display: block !important;
       border: 1px solid #999 !important;
       border-left: 4px solid #333 !important;
       background: #ffffff !important;
@@ -338,12 +356,7 @@
     }
   }
 
-
   @media (max-width: 600px) {
-
-    #exportTools {
-      padding: 0 16px;
-    }
 
     #exportTools button {
       flex: 1 1 100%;
@@ -353,45 +366,84 @@
 </style>
 
 
-<div id="exportTools">
-
-  <button
-    id="exportPrintBtn"
-    type="button"
-  >
-    Print
-  </button>
-
-  <button
-    id="exportPdfBtn"
-    type="button"
-  >
-    Save as PDF
-  </button>
-
-  <button
-    id="exportCsvBtn"
-    type="button"
-  >
-    Save as CSV (Excel)
-  </button>
-
-</div>
-
-
-<div id="pdfHelp">
-  In the print window, choose
-  <strong>Save as PDF</strong>
-  as the destination.
-</div>
-
-
 <script>
 
 (function () {
 
+  const searchPanel =
+    document.querySelector(".search-panel");
+
+  const status =
+    document.getElementById("status");
+
+  const personSummary =
+    document.getElementById("personSummary");
+
+  const resultsBody =
+    document.getElementById("body");
+
+  const resultsHead =
+    document.getElementById("head");
+
+
+  /* Create export controls near the top */
+
+  const reportingRange =
+    document.createElement("div");
+
+  reportingRange.id = "reportingRange";
+
+
   const exportTools =
-    document.getElementById("exportTools");
+    document.createElement("div");
+
+  exportTools.id = "exportTools";
+
+
+  exportTools.innerHTML = `
+    <button id="exportPrintBtn" type="button">
+      Print
+    </button>
+
+    <button id="exportPdfBtn" type="button">
+      Save as PDF
+    </button>
+
+    <button id="exportCsvBtn" type="button">
+      Save as CSV (Excel)
+    </button>
+  `;
+
+
+  const pdfHelp =
+    document.createElement("div");
+
+  pdfHelp.id = "pdfHelp";
+
+  pdfHelp.innerHTML =
+    'In the print window, choose <strong>Save as PDF</strong> as the destination.';
+
+
+  /*
+    Place reporting range and export tools
+    near the top of the search panel.
+  */
+
+  searchPanel.insertBefore(
+    reportingRange,
+    status
+  );
+
+  searchPanel.insertBefore(
+    exportTools,
+    status
+  );
+
+  searchPanel.insertBefore(
+    pdfHelp,
+    status
+  );
+
 
   const printBtn =
     document.getElementById("exportPrintBtn");
@@ -402,30 +454,124 @@
   const csvBtn =
     document.getElementById("exportCsvBtn");
 
-  const pdfHelp =
-    document.getElementById("pdfHelp");
 
-  const resultsBody =
-    document.getElementById("body");
+  function getDisplayedRows() {
 
-  const resultsHead =
-    document.getElementById("head");
+    return Array.from(
+      resultsBody.querySelectorAll("tr")
+    );
+  }
+
+
+  function getAcademicYearsFromResults() {
+
+    const years = new Set();
+
+    const headerCells =
+      Array.from(
+        resultsHead.querySelectorAll("th")
+      );
+
+    const ayIndex =
+      headerCells.findIndex(
+        cell =>
+          cell.textContent.trim() === "AY"
+      );
+
+    if (ayIndex === -1) {
+      return [];
+    }
+
+    getDisplayedRows().forEach(row => {
+
+      const cells =
+        row.querySelectorAll("td");
+
+      if (
+        cells.length > ayIndex
+      ) {
+
+        const ay =
+          cells[ayIndex]
+            .textContent
+            .trim();
+
+        if (ay) {
+          years.add(ay);
+        }
+      }
+    });
+
+
+    return Array.from(years).sort();
+  }
+
+
+  function updateReportingRange() {
+
+    const years =
+      getAcademicYearsFromResults();
+
+    if (years.length === 0) {
+
+      reportingRange.textContent = "";
+      reportingRange.classList.remove(
+        "visible"
+      );
+
+      return;
+    }
+
+
+    if (years.length === 1) {
+
+      reportingRange.textContent =
+        "Reporting Range: AY " +
+        years[0];
+
+    } else {
+
+      reportingRange.textContent =
+        "Reporting Range: AY " +
+        years[0] +
+        " to AY " +
+        years[years.length - 1];
+    }
+
+
+    reportingRange.classList.add(
+      "visible"
+    );
+  }
 
 
   function updateExportTools() {
 
     const hasResults =
-      resultsBody &&
-      resultsBody.querySelectorAll("tr").length > 0;
+      getDisplayedRows().length > 0;
+
 
     if (hasResults) {
 
-      exportTools.classList.add("visible");
+      exportTools.classList.add(
+        "visible"
+      );
+
+      updateReportingRange();
 
     } else {
 
-      exportTools.classList.remove("visible");
-      pdfHelp.classList.remove("visible");
+      exportTools.classList.remove(
+        "visible"
+      );
+
+      reportingRange.classList.remove(
+        "visible"
+      );
+
+      pdfHelp.classList.remove(
+        "visible"
+      );
     }
   }
 
@@ -433,7 +579,9 @@
   if (resultsBody) {
 
     const observer =
-      new MutationObserver(updateExportTools);
+      new MutationObserver(
+        updateExportTools
+      );
 
     observer.observe(
       resultsBody,
@@ -453,7 +601,9 @@
     "click",
     function () {
 
-      pdfHelp.classList.remove("visible");
+      pdfHelp.classList.remove(
+        "visible"
+      );
 
       window.print();
     }
@@ -466,14 +616,14 @@
     "click",
     function () {
 
-      pdfHelp.classList.add("visible");
+      pdfHelp.classList.add(
+        "visible"
+      );
 
       window.print();
     }
   );
 
-
-  /* CSV HELPERS */
 
   function csvEscape(value) {
 
@@ -500,30 +650,71 @@
       resultsHead.querySelectorAll("th");
 
     const headers =
-      Array.from(headerCells).map(
+      Array.from(
+        headerCells
+      ).map(
         cell =>
           cell.textContent.trim()
       );
 
+
+    const years =
+      getAcademicYearsFromResults();
+
+
+    if (years.length === 1) {
+
+      rows.push([
+        "Reporting Range",
+        "AY " + years[0]
+      ]);
+
+    } else if (years.length > 1) {
+
+      rows.push([
+        "Reporting Range",
+        "AY " +
+        years[0] +
+        " to AY " +
+        years[years.length - 1]
+      ]);
+    }
+
+
+    if (
+      personSummary &&
+      personSummary.style.display !== "none" &&
+      personSummary.textContent.trim()
+    ) {
+
+      rows.push([
+        "Participation Summary",
+        personSummary.textContent.trim()
+      ]);
+    }
+
+
+    rows.push([]);
+
     rows.push(headers);
 
 
-    const tableRows =
-      resultsBody.querySelectorAll("tr");
-
-    tableRows.forEach(row => {
+    getDisplayedRows().forEach(row => {
 
       const cells =
         row.querySelectorAll("td");
 
       const values =
-        Array.from(cells).map(
+        Array.from(
+          cells
+        ).map(
           cell =>
             cell.textContent.trim()
         );
 
       rows.push(values);
     });
+
 
     return rows;
   }
@@ -654,6 +845,8 @@
   );
 
 })();
+
+</script>
 
 </script>
 
