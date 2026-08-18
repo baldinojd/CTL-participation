@@ -731,14 +731,15 @@ document.addEventListener("DOMContentLoaded", async function () {
           : "Data updated: —";
     }
 
-    populateFilters();
+populateFilters();
 
-    renderResults(
-      events,
-      false
-    );
+/* Start with no results displayed */
+body.innerHTML = "";
+setEventHeader();
+empty.style.display = "none";
+status.textContent = "Enter a search term or select a filter to begin.";
 
-  } catch (error) {
+} catch (error) {
 
     console.error(error);
 
