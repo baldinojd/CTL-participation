@@ -21,7 +21,8 @@ document.addEventListener("DOMContentLoaded", async function () {
   let events = [];
   let selectedPerson = "";
 
-  const cohortMembership = new Map();
+  const ftCohortMembership = new Map();
+  const ctlBlueMembership = new Map();
 
 
   /* =========================================================
@@ -42,24 +43,48 @@ document.addEventListener("DOMContentLoaded", async function () {
   }
 
 
+  /*
+    Canonical CSV format:
+      Last, First
+
+    Interface format:
+      First Last
+  */
+
   function displayPersonName(person) {
 
     if (!person) {
       return "";
     }
 
-    if (person.includes(",")) {
-
-      const parts = person.split(",");
-
-      return (
-        parts.slice(1).join(",").trim() +
-        " " +
-        parts[0].trim()
-      );
+    if (!person.includes(",")) {
+      return person.trim();
     }
 
-    return person;
+    const parts = person.split(",");
+
+    const last =
+      parts[0].trim();
+
+    const first =
+      parts
+        .slice(1)
+        .join(",")
+        .trim();
+
+    return (
+      first + " " + last
+    ).trim();
+  }
+
+
+  function displayParticipantList(
+    participants
+  ) {
+
+    return participants
+      .map(displayPersonName)
+      .join("; ");
   }
 
 
@@ -75,10 +100,17 @@ document.addEventListener("DOMContentLoaded", async function () {
     let field = "";
     let inQuotes = false;
 
-    for (let i = 0; i < text.length; i++) {
+    for (
+      let i = 0;
+      i < text.length;
+      i++
+    ) {
 
-      const char = text[i];
-      const next = text[i + 1];
+      const char =
+        text[i];
+
+      const next =
+        text[i + 1];
 
       if (
         char === '"' &&
@@ -89,9 +121,12 @@ document.addEventListener("DOMContentLoaded", async function () {
         field += '"';
         i++;
 
-      } else if (char === '"') {
+      } else if (
+        char === '"'
+      ) {
 
-        inQuotes = !inQuotes;
+        inQuotes =
+          !inQuotes;
 
       } else if (
         char === "," &&
@@ -102,7 +137,10 @@ document.addEventListener("DOMContentLoaded", async function () {
         field = "";
 
       } else if (
-        (char === "\n" || char === "\r") &&
+        (
+          char === "\n" ||
+          char === "\r"
+        ) &&
         !inQuotes
       ) {
 
@@ -118,7 +156,8 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         if (
           row.some(
-            cell => cell.trim() !== ""
+            cell =>
+              cell.trim() !== ""
           )
         ) {
           rows.push(row);
@@ -132,6 +171,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       }
     }
 
+
     if (
       field.length ||
       row.length
@@ -141,7 +181,8 @@ document.addEventListener("DOMContentLoaded", async function () {
 
       if (
         row.some(
-          cell => cell.trim() !== ""
+          cell =>
+            cell.trim() !== ""
         )
       ) {
         rows.push(row);
@@ -173,9 +214,12 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   function loadParticipationCSV(text) {
 
-    const rows = parseCSV(text);
+    const rows =
+      parseCSV(text);
 
-    if (rows.length < 2) {
+    if (
+      rows.length < 2
+    ) {
 
       return {
         events: [],
@@ -183,106 +227,237 @@ document.addEventListener("DOMContentLoaded", async function () {
       };
     }
 
-    const headers = getHeaders(rows);
+
+    const headers =
+      getHeaders(rows);
+
 
     const index = {
-      updated: headers.indexOf("Updated"),
-      date: headers.indexOf("Date"),
-      semester: headers.indexOf("Semester"),
-      ay: headers.indexOf("AY"),
-      topic: headers.indexOf("Topic"),
-      facilitator: headers.indexOf("Facilitator"),
-      participants: headers.indexOf("Participants"),
-      total: headers.indexOf("Total"),
-      type: headers.indexOf("Event Type")
+
+      updated:
+        headers.indexOf(
+          "Updated"
+        ),
+
+      date:
+        headers.indexOf(
+          "Date"
+        ),
+
+      semester:
+        headers.indexOf(
+          "Semester"
+        ),
+
+      ay:
+        headers.indexOf(
+          "AY"
+        ),
+
+      topic:
+        headers.indexOf(
+          "Topic"
+        ),
+
+      facilitator:
+        headers.indexOf(
+          "Facilitator"
+        ),
+
+      participants:
+        headers.indexOf(
+          "Participants"
+        ),
+
+      total:
+        headers.indexOf(
+          "Total"
+        ),
+
+      type:
+        headers.indexOf(
+          "Event Type"
+        )
     };
+
 
     const updated =
       index.updated >= 0
-        ? (rows[1][index.updated] || "").trim()
+        ? (
+            rows[1][
+              index.updated
+            ] || ""
+          ).trim()
         : "";
+
 
     const parsedEvents =
       rows
         .slice(1)
-        .map(row => ({
+        .map(row => {
 
-          date:
-            row[index.date] || "",
+          let topic =
+            (
+              row[index.topic] ||
+              ""
+            ).trim();
 
-          semester:
-            row[index.semester] || "",
+          let type =
+            (
+              row[index.type] ||
+              ""
+            ).trim();
 
-          academicYear:
-            row[index.ay] || "",
 
-         topic:
-  normalize(row[index.topic]) === normalize("One-on-One Office Hours")
-    ? "Office Hours"
-    : row[index.topic] || "",
+          /*
+            Normalize historical terminology.
+          */
 
-          facilitator:
-            row[index.facilitator] || "",
+          if (
+            normalize(topic) ===
+            normalize(
+              "One-on-One Office Hours"
+            )
+          ) {
 
-          participants:
-            (row[index.participants] || "")
-              .split(";")
-              .map(name => name.trim())
-              .filter(Boolean),
+            topic =
+              "Office Hours";
+          }
 
-          total:
-            Number(
-              row[index.total] || 0
-            ),
 
-type:
-  normalize(row[index.type]) === normalize("One-on-One Office Hours")
-    ? "Office Hours"
-    : row[index.type] || "",
+          if (
+            normalize(type) ===
+            normalize(
+              "One-on-One Office Hours"
+            )
+          ) {
 
-          source:
-            "Participation",
+            type =
+              "Office Hours";
+          }
 
-          rosterOnly:
-            false
-        }));
+
+          return {
+
+            date:
+              (
+                row[index.date] ||
+                ""
+              ).trim(),
+
+            semester:
+              (
+                row[
+                  index.semester
+                ] ||
+                ""
+              ).trim(),
+
+            academicYear:
+              (
+                row[index.ay] ||
+                ""
+              ).trim(),
+
+            topic:
+              topic,
+
+            facilitator:
+              (
+                row[
+                  index.facilitator
+                ] ||
+                ""
+              ).trim(),
+
+            participants:
+              (
+                row[
+                  index.participants
+                ] ||
+                ""
+              )
+                .split(";")
+                .map(
+                  name =>
+                    name.trim()
+                )
+                .filter(Boolean),
+
+            total:
+              Number(
+                row[index.total] ||
+                0
+              ),
+
+            type:
+              type,
+
+            source:
+              "Participation"
+          };
+        });
+
 
     return {
-      events: parsedEvents,
-      updated: updated
+      events:
+        parsedEvents,
+      updated:
+        updated
     };
   }
 
 
   /* =========================================================
-     FULL-TIME COHORT MEMBERSHIP
+     PROGRAM MEMBERSHIP
      ========================================================= */
 
-  function loadCohortMembershipCSV(text) {
+  function loadMembershipCSV(
+    text,
+    membershipMap
+  ) {
 
-    const rows = parseCSV(text);
+    const rows =
+      parseCSV(text);
 
-    if (rows.length < 2) {
+    if (
+      rows.length < 2
+    ) {
       return;
     }
 
-    const headers = getHeaders(rows);
+
+    const headers =
+      getHeaders(rows);
+
 
     const ayIndex =
       headers.indexOf("AY");
 
     const participantIndex =
-      headers.indexOf("Participant");
+      headers.indexOf(
+        "Participant"
+      );
+
 
     rows
       .slice(1)
       .forEach(row => {
 
         const ay =
-          (row[ayIndex] || "").trim();
+          (
+            row[ayIndex] ||
+            ""
+          ).trim();
 
         const participant =
-          (row[participantIndex] || "").trim();
+          (
+            row[
+              participantIndex
+            ] ||
+            ""
+          ).trim();
+
 
         if (
           !ay ||
@@ -291,23 +466,33 @@ type:
           return;
         }
 
+
         const key =
-          personKey(participant);
+          personKey(
+            participant
+          );
+
 
         if (
-          !cohortMembership.has(key)
+          !membershipMap.has(
+            key
+          )
         ) {
 
-          cohortMembership.set(
+          membershipMap.set(
             key,
             {
-              name: participant,
-              years: new Set()
+              name:
+                participant,
+
+              years:
+                new Set()
             }
           );
         }
 
-        cohortMembership
+
+        membershipMap
           .get(key)
           .years
           .add(ay);
@@ -315,10 +500,13 @@ type:
   }
 
 
-  function getCohortYears(person) {
+  function getMembershipYears(
+    membershipMap,
+    person
+  ) {
 
     const record =
-      cohortMembership.get(
+      membershipMap.get(
         personKey(person)
       );
 
@@ -333,54 +521,113 @@ type:
 
 
   /* =========================================================
-     FULL-TIME COHORT ATTENDANCE
+     FULL-TIME COHORT SESSION ATTENDANCE
      ========================================================= */
 
-  function loadCohortAttendanceCSV(text) {
+  function loadCohortAttendanceCSV(
+    text
+  ) {
 
-    const rows = parseCSV(text);
+    const rows =
+      parseCSV(text);
 
-    if (rows.length < 2) {
+    if (
+      rows.length < 2
+    ) {
       return [];
     }
 
-    const headers = getHeaders(rows);
+
+    const headers =
+      getHeaders(rows);
+
 
     const index = {
-      ay: headers.indexOf("AY"),
-      participant: headers.indexOf("Participant"),
-      semester: headers.indexOf("Semester"),
-      title: headers.indexOf("Session Title"),
-      date: headers.indexOf("Date"),
-      attended: headers.indexOf("Attended")
+
+      ay:
+        headers.indexOf(
+          "AY"
+        ),
+
+      participant:
+        headers.indexOf(
+          "Participant"
+        ),
+
+      semester:
+        headers.indexOf(
+          "Semester"
+        ),
+
+      title:
+        headers.indexOf(
+          "Session Title"
+        ),
+
+      date:
+        headers.indexOf(
+          "Date"
+        ),
+
+      attended:
+        headers.indexOf(
+          "Attended"
+        )
     };
+
 
     const groupedSessions =
       new Map();
+
 
     rows
       .slice(1)
       .forEach(row => {
 
         const ay =
-          (row[index.ay] || "").trim();
+          (
+            row[index.ay] ||
+            ""
+          ).trim();
 
         const participant =
-          (row[index.participant] || "").trim();
+          (
+            row[
+              index.participant
+            ] ||
+            ""
+          ).trim();
 
         const semester =
-          (row[index.semester] || "").trim();
+          (
+            row[
+              index.semester
+            ] ||
+            ""
+          ).trim();
 
         const title =
-          (row[index.title] || "").trim();
+          (
+            row[index.title] ||
+            ""
+          ).trim();
 
         const date =
-          (row[index.date] || "").trim();
+          (
+            row[index.date] ||
+            ""
+          ).trim();
 
         const attended =
-          (row[index.attended] || "")
+          (
+            row[
+              index.attended
+            ] ||
+            ""
+          )
             .trim()
             .toLowerCase();
+
 
         if (
           !ay ||
@@ -390,11 +637,23 @@ type:
           return;
         }
 
+
         const didAttend =
           attended === "yes" ||
           attended === "y" ||
           attended === "true" ||
           attended === "1";
+
+
+        /*
+          A "No" record documents an absence.
+          It does NOT create attendance.
+        */
+
+        if (!didAttend) {
+          return;
+        }
+
 
         const key =
           [
@@ -404,168 +663,104 @@ type:
             title
           ].join("|||");
 
+
         if (
-          !groupedSessions.has(key)
+          !groupedSessions.has(
+            key
+          )
         ) {
 
           groupedSessions.set(
             key,
             {
-              date: date,
-              semester: semester,
-              academicYear: ay,
-              topic: title,
+              date:
+                date,
+
+              semester:
+                semester,
+
+              academicYear:
+                ay,
+
+              topic:
+                title,
+
               facilitator:
                 FT_COHORT_FACILITATOR,
-              participants: [],
-              total: 0,
-              type: "Full-Time Cohort",
-              source:
+
+              participants:
+                [],
+
+              total:
+                0,
+
+              type:
                 "Full-Time Cohort",
-              rosterOnly: false
+
+              source:
+                "Full-Time Cohort Attendance"
             }
           );
         }
 
-        if (didAttend) {
 
-          const session =
-            groupedSessions.get(key);
+        const session =
+          groupedSessions.get(
+            key
+          );
 
-          const alreadyPresent =
-            session.participants.some(
-              existing =>
-                personKey(existing) ===
-                personKey(participant)
-            );
 
-          if (!alreadyPresent) {
+        const alreadyPresent =
+          session.participants.some(
+            existing =>
+              personKey(existing) ===
+              personKey(
+                participant
+              )
+          );
 
-            session.participants.push(
-              participant
-            );
-          }
+
+        if (
+          !alreadyPresent
+        ) {
+
+          session.participants.push(
+            participant
+          );
         }
       });
+
 
     const cohortEvents =
       Array.from(
         groupedSessions.values()
       );
 
-    cohortEvents.forEach(event => {
 
-      event.participants.sort(
-        (a, b) =>
-          a.localeCompare(b)
-      );
+    cohortEvents.forEach(
+      event => {
 
-      event.total =
-        event.participants.length + 1;
-    });
+        event.participants.sort(
+          (a, b) =>
+            displayPersonName(a)
+              .localeCompare(
+                displayPersonName(b)
+              )
+        );
+
+
+        /*
+          Total includes facilitator.
+        */
+
+        event.total =
+          event.participants.length +
+          1;
+      }
+    );
+
 
     return cohortEvents;
-  }
-
-
-  /* =========================================================
-     EARLIER FT COHORT ROSTERS
-     ========================================================= */
-
-  function buildCohortRosterEvents(
-    cohortEvents
-  ) {
-
-    const detailedYears =
-      new Set(
-        cohortEvents
-          .map(
-            event =>
-              event.academicYear
-          )
-          .filter(Boolean)
-      );
-
-    const rosters =
-      new Map();
-
-    cohortMembership.forEach(
-      record => {
-
-        record.years.forEach(
-          year => {
-
-            if (
-              !rosters.has(year)
-            ) {
-              rosters.set(
-                year,
-                []
-              );
-            }
-
-            rosters
-              .get(year)
-              .push(
-                record.name
-              );
-          }
-        );
-      }
-    );
-
-    const rosterEvents = [];
-
-    rosters.forEach(
-      (people, year) => {
-
-        if (
-          detailedYears.has(year)
-        ) {
-          return;
-        }
-
-        people.sort(
-          (a, b) =>
-            a.localeCompare(b)
-        );
-
-        rosterEvents.push({
-
-          date: "",
-
-          semester: "",
-
-          academicYear:
-            year,
-
-          topic:
-            "Full-Time Cohort: AY " +
-            year +
-            " Roster",
-
-          facilitator:
-            FT_COHORT_FACILITATOR,
-
-          participants:
-            people,
-
-          total:
-            people.length + 1,
-
-          type:
-            "Full-Time Cohort",
-
-          source:
-            "Full-Time Cohort Roster",
-
-          rosterOnly:
-            true
-        });
-      }
-    );
-
-    return rosterEvents;
   }
 
 
@@ -575,44 +770,96 @@ type:
 
   function loadIRTCSV(text) {
 
-    const rows = parseCSV(text);
+    const rows =
+      parseCSV(text);
 
-    if (rows.length < 2) {
+    if (
+      rows.length < 2
+    ) {
       return [];
     }
 
-    const headers = getHeaders(rows);
+
+    const headers =
+      getHeaders(rows);
+
 
     const index = {
-      ay: headers.indexOf("AY"),
-      semester: headers.indexOf("Semester"),
-      program: headers.indexOf("Program"),
-      facilitator: headers.indexOf("Facilitator"),
-      participant: headers.indexOf("Participant")
+
+      ay:
+        headers.indexOf(
+          "AY"
+        ),
+
+      semester:
+        headers.indexOf(
+          "Semester"
+        ),
+
+      program:
+        headers.indexOf(
+          "Program"
+        ),
+
+      facilitator:
+        headers.indexOf(
+          "Facilitator"
+        ),
+
+      participant:
+        headers.indexOf(
+          "Participant"
+        )
     };
+
 
     const groups =
       new Map();
+
 
     rows
       .slice(1)
       .forEach(row => {
 
         const ay =
-          (row[index.ay] || "").trim();
+          (
+            row[index.ay] ||
+            ""
+          ).trim();
 
         const semester =
-          (row[index.semester] || "").trim();
+          (
+            row[
+              index.semester
+            ] ||
+            ""
+          ).trim();
 
         const program =
-          (row[index.program] || "").trim();
+          (
+            row[
+              index.program
+            ] ||
+            ""
+          ).trim();
 
         const participant =
-          (row[index.participant] || "").trim();
+          (
+            row[
+              index.participant
+            ] ||
+            ""
+          ).trim();
 
         const facilitator =
-          (row[index.facilitator] || "").trim()
-          || IRT_FACILITATOR;
+          (
+            row[
+              index.facilitator
+            ] ||
+            ""
+          ).trim() ||
+          IRT_FACILITATOR;
+
 
         if (
           !ay ||
@@ -623,12 +870,14 @@ type:
           return;
         }
 
+
         const key =
           [
             ay,
             semester,
             program
           ].join("|||");
+
 
         if (
           !groups.has(key)
@@ -637,32 +886,54 @@ type:
           groups.set(
             key,
             {
-              date: "",
-              semester: semester,
-              academicYear: ay,
-              topic: program,
-              facilitator: facilitator,
-              participants: [],
-              total: 0,
-              type: program,
+              date:
+                "",
+
+              semester:
+                semester,
+
+              academicYear:
+                ay,
+
+              topic:
+                program,
+
+              facilitator:
+                facilitator,
+
+              participants:
+                [],
+
+              total:
+                0,
+
+              type:
+                program,
+
               source:
-                "Instructor Readiness Training",
-              rosterOnly: false
+                "Instructor Readiness Training"
             }
           );
         }
 
+
         const event =
           groups.get(key);
+
 
         const alreadyPresent =
           event.participants.some(
             existing =>
               personKey(existing) ===
-              personKey(participant)
+              personKey(
+                participant
+              )
           );
 
-        if (!alreadyPresent) {
+
+        if (
+          !alreadyPresent
+        ) {
 
           event.participants.push(
             participant
@@ -670,21 +941,31 @@ type:
         }
       });
 
+
     const irtEvents =
       Array.from(
         groups.values()
       );
 
-    irtEvents.forEach(event => {
 
-      event.participants.sort(
-        (a, b) =>
-          a.localeCompare(b)
-      );
+    irtEvents.forEach(
+      event => {
 
-      event.total =
-        event.participants.length + 1;
-    });
+        event.participants.sort(
+          (a, b) =>
+            displayPersonName(a)
+              .localeCompare(
+                displayPersonName(b)
+              )
+        );
+
+
+        event.total =
+          event.participants.length +
+          1;
+      }
+    );
+
 
     return irtEvents;
   }
@@ -694,14 +975,20 @@ type:
      OFFICE HOURS
      ========================================================= */
 
-  function isOfficeHoursEvent(event) {
+  function isOfficeHoursEvent(
+    event
+  ) {
 
     return (
       normalize(event.type) ===
-        normalize("Office Hours") ||
+        normalize(
+          "Office Hours"
+        ) ||
       normalize(event.topic)
         .includes(
-          normalize("Office Hours")
+          normalize(
+            "Office Hours"
+          )
         )
     );
   }
@@ -728,10 +1015,13 @@ type:
     const existing =
       new Set();
 
+
     participationEvents
       .filter(
         event =>
-          isOfficeHoursEvent(event)
+          isOfficeHoursEvent(
+            event
+          )
       )
       .forEach(event => {
 
@@ -749,15 +1039,10 @@ type:
         );
       });
 
+
     return existing;
   }
 
-
-  /*
-    Supplemental Office Hours are grouped by
-    AY + Semester so they display like the
-    existing master Office Hours records.
-  */
 
   function loadOfficeHoursCSV(
     text,
@@ -773,18 +1058,32 @@ type:
       return [];
     }
 
+
     const headers =
       getHeaders(rows);
 
+
     const index = {
+
       ay:
-        headers.indexOf("AY"),
+        headers.indexOf(
+          "AY"
+        ),
+
       semester:
-        headers.indexOf("Semester"),
+        headers.indexOf(
+          "Semester"
+        ),
+
       facilitator:
-        headers.indexOf("Facilitator"),
+        headers.indexOf(
+          "Facilitator"
+        ),
+
       participant:
-        headers.indexOf("Participant")
+        headers.indexOf(
+          "Participant"
+        )
     };
 
 
@@ -803,17 +1102,35 @@ type:
       .forEach(row => {
 
         const ay =
-          (row[index.ay] || "").trim();
+          (
+            row[index.ay] ||
+            ""
+          ).trim();
 
         const semester =
-          (row[index.semester] || "").trim();
+          (
+            row[
+              index.semester
+            ] ||
+            ""
+          ).trim();
 
         const participant =
-          (row[index.participant] || "").trim();
+          (
+            row[
+              index.participant
+            ] ||
+            ""
+          ).trim();
 
         const facilitator =
-          (row[index.facilitator] || "").trim()
-          || OFFICE_HOURS_FACILITATOR;
+          (
+            row[
+              index.facilitator
+            ] ||
+            ""
+          ).trim() ||
+          OFFICE_HOURS_FACILITATOR;
 
 
         if (
@@ -825,12 +1142,6 @@ type:
         }
 
 
-        /*
-          Do not add someone already represented
-          in the master Office Hours data for the
-          same AY and semester.
-        */
-
         const personSemesterKey =
           makeOfficeHoursPersonKey(
             ay,
@@ -838,6 +1149,11 @@ type:
             participant
           );
 
+
+        /*
+          Do not duplicate an Office Hours
+          record already in the master.
+        */
 
         if (
           existingMasterPeople.has(
@@ -864,17 +1180,32 @@ type:
           grouped.set(
             groupKey,
             {
-              date: "",
-              semester: semester,
-              academicYear: ay,
-              topic: "Office Hours",
-              facilitator: facilitator,
-              participants: [],
-              total: 0,
-              type: "Office Hours",
+              date:
+                "",
+
+              semester:
+                semester,
+
+              academicYear:
+                ay,
+
+              topic:
+                "Office Hours",
+
+              facilitator:
+                facilitator,
+
+              participants:
+                [],
+
+              total:
+                0,
+
+              type:
+                "Office Hours",
+
               source:
-                "Office Hours Supplemental",
-              rosterOnly: false
+                "Office Hours Supplemental"
             }
           );
         }
@@ -890,7 +1221,9 @@ type:
           event.participants.some(
             existing =>
               personKey(existing) ===
-              personKey(participant)
+              personKey(
+                participant
+              )
           );
 
 
@@ -916,16 +1249,16 @@ type:
 
         event.participants.sort(
           (a, b) =>
-            a.localeCompare(b)
+            displayPersonName(a)
+              .localeCompare(
+                displayPersonName(b)
+              )
         );
 
 
-        /*
-          Total = participants + facilitator.
-        */
-
         event.total =
-          event.participants.length + 1;
+          event.participants.length +
+          1;
       }
     );
 
@@ -961,12 +1294,28 @@ type:
       );
 
 
-    cohortMembership.forEach(
-      record => {
+    /*
+      Membership AYs also belong in the
+      AY selector even when no session
+      has yet occurred.
+    */
 
-        record.years.forEach(
-          year =>
-            yearSet.add(year)
+    [
+      ftCohortMembership,
+      ctlBlueMembership
+    ].forEach(
+      membershipMap => {
+
+        membershipMap.forEach(
+          record => {
+
+            record.years.forEach(
+              year =>
+                yearSet.add(
+                  year
+                )
+            );
+          }
         );
       }
     );
@@ -1052,23 +1401,25 @@ type:
           )
       )
       .sort()
-      .forEach(semester => {
+      .forEach(
+        semester => {
 
-        const option =
-          document.createElement(
-            "option"
+          const option =
+            document.createElement(
+              "option"
+            );
+
+          option.value =
+            semester;
+
+          option.textContent =
+            semester;
+
+          semesterSelect.appendChild(
+            option
           );
-
-        option.value =
-          semester;
-
-        option.textContent =
-          semester;
-
-        semesterSelect.appendChild(
-          option
-        );
-      });
+        }
+      );
 
 
     const preferredTypes = [
@@ -1157,73 +1508,82 @@ type:
      PEOPLE
      ========================================================= */
 
+  function addPersonToMap(
+    people,
+    person
+  ) {
+
+    if (!person) {
+      return;
+    }
+
+    const key =
+      personKey(person);
+
+    if (
+      !people.has(key)
+    ) {
+
+      people.set(
+        key,
+        person
+      );
+    }
+  }
+
+
   function getAllPeople() {
 
     const people =
       new Map();
 
 
+    /*
+      Actual participation.
+    */
+
     events.forEach(event => {
 
-      if (
+      addPersonToMap(
+        people,
         event.facilitator
-      ) {
-
-        const key =
-          personKey(
-            event.facilitator
-          );
-
-        if (
-          !people.has(key)
-        ) {
-
-          people.set(
-            key,
-            event.facilitator
-          );
-        }
-      }
+      );
 
 
       event.participants.forEach(
-        person => {
-
-          const key =
-            personKey(person);
-
-          if (
-            !people.has(key)
-          ) {
-
-            people.set(
-              key,
-              person
-            );
-          }
-        }
+        person =>
+          addPersonToMap(
+            people,
+            person
+          )
       );
     });
 
 
-    cohortMembership.forEach(
-      record => {
+    /*
+      Program membership.
 
-        const key =
-          personKey(
-            record.name
-          );
+      This makes enrolled people searchable
+      even if they have not yet attended
+      a session. This is especially important
+      for CTL Blue AY 2026-2027.
+    */
 
-        if (
-          !people.has(key)
-        ) {
+    ftCohortMembership.forEach(
+      record =>
+        addPersonToMap(
+          people,
+          record.name
+        )
+    );
 
-          people.set(
-            key,
-            record.name
-          );
-        }
-      }
+
+    ctlBlueMembership.forEach(
+      record =>
+        addPersonToMap(
+          people,
+          record.name
+        )
     );
 
 
@@ -1231,7 +1591,10 @@ type:
       ...people.values()
     ].sort(
       (a, b) =>
-        a.localeCompare(b)
+        displayPersonName(a)
+          .localeCompare(
+            displayPersonName(b)
+          )
     );
   }
 
@@ -1242,10 +1605,18 @@ type:
   ) {
 
     const normalizedName =
+      normalize(
+        displayPersonName(
+          name
+        )
+      );
+
+    const canonicalName =
       normalize(name);
 
     const normalizedQuery =
       normalize(query);
+
 
     if (
       !normalizedQuery
@@ -1253,12 +1624,23 @@ type:
       return false;
     }
 
+
     const queryParts =
-      normalizedQuery.split(" ");
+      normalizedQuery
+        .split(" ");
+
+
+    /*
+      Search works with either
+      First Last or Last, First.
+    */
 
     return queryParts.every(
       part =>
         normalizedName.includes(
+          part
+        ) ||
+        canonicalName.includes(
           part
         )
     );
@@ -1286,7 +1668,9 @@ type:
 
     return (
       personKey(name) ===
-      personKey(selectedName)
+      personKey(
+        selectedName
+      )
     );
   }
 
@@ -1305,6 +1689,7 @@ type:
     ) {
       return true;
     }
+
 
     return event.participants.some(
       participant =>
@@ -1331,20 +1716,24 @@ type:
     const selectedType =
       typeSelect.value;
 
+
     const yearMatch =
       !selectedYear ||
       event.academicYear ===
         selectedYear;
+
 
     const semesterMatch =
       !selectedSemester ||
       event.semester ===
         selectedSemester;
 
+
     const typeMatch =
       !selectedType ||
       event.type ===
         selectedType;
+
 
     return (
       yearMatch &&
@@ -1366,6 +1755,7 @@ type:
       return true;
     }
 
+
     const searchableText =
       normalize(
         [
@@ -1374,13 +1764,21 @@ type:
           event.academicYear,
           event.topic,
           event.facilitator,
+          displayPersonName(
+            event.facilitator
+          ),
           event.type,
-          ...event.participants
+          ...event.participants,
+          ...event.participants.map(
+            displayPersonName
+          )
         ].join(" ")
       );
 
+
     const queryParts =
       q.split(" ");
+
 
     return queryParts.every(
       part =>
@@ -1405,12 +1803,15 @@ type:
         "td"
       );
 
+
     if (
       className
     ) {
+
       td.className =
         className;
     }
+
 
     td.textContent =
       text || "";
@@ -1450,7 +1851,7 @@ type:
 
 
   /* =========================================================
-     PERSON SELECTION + SUMMARY
+     PERSON SELECTION
      ========================================================= */
 
   function hidePersonChoices() {
@@ -1486,6 +1887,7 @@ type:
     personChoices.innerHTML =
       "";
 
+
     const message =
       document.createElement(
         "div"
@@ -1499,9 +1901,11 @@ type:
       query +
       '". Please select the person you want:';
 
+
     personChoices.appendChild(
       message
     );
+
 
     const buttons =
       document.createElement(
@@ -1510,6 +1914,7 @@ type:
 
     buttons.className =
       "person-choice-buttons";
+
 
     people.forEach(person => {
 
@@ -1529,6 +1934,7 @@ type:
           person
         );
 
+
       button.addEventListener(
         "click",
         function () {
@@ -1544,10 +1950,12 @@ type:
         }
       );
 
+
       buttons.appendChild(
         button
       );
     });
+
 
     personChoices.appendChild(
       buttons
@@ -1555,6 +1963,7 @@ type:
 
     personChoices.style.display =
       "block";
+
 
     body.innerHTML =
       "";
@@ -1569,22 +1978,42 @@ type:
   }
 
 
+  /* =========================================================
+     PERSON SUMMARY
+     ========================================================= */
+
   function displayPersonSummary(
     person,
     total
   ) {
 
     const displayName =
-      displayPersonName(person);
+      displayPersonName(
+        person
+      );
+
 
     const cohortYears =
-      getCohortYears(person);
+      getMembershipYears(
+        ftCohortMembership,
+        person
+      );
+
+
+    const blueYears =
+      getMembershipYears(
+        ctlBlueMembership,
+        person
+      );
+
 
     let html =
       "<strong>" +
       displayName +
       "</strong>" +
+
       " &nbsp;|&nbsp; " +
+
       "<strong>Total Sessions Attended:</strong> " +
       total;
 
@@ -1601,10 +2030,31 @@ type:
           )
           .join(", ");
 
+
       html +=
         " &nbsp;|&nbsp; " +
         "<strong>Full-Time Cohort:</strong> " +
         cohortText;
+    }
+
+
+    if (
+      blueYears.length
+    ) {
+
+      const blueText =
+        blueYears
+          .map(
+            year =>
+              "AY " + year
+          )
+          .join(", ");
+
+
+      html +=
+        " &nbsp;|&nbsp; " +
+        "<strong>CTL Blue:</strong> " +
+        blueText;
     }
 
 
@@ -1628,13 +2078,18 @@ type:
     body.innerHTML =
       "";
 
+
     if (
       personMode
     ) {
+
       setPersonHeader();
+
     } else {
+
       setEventHeader();
     }
+
 
     if (
       results.length === 0
@@ -1649,8 +2104,10 @@ type:
       return;
     }
 
+
     empty.style.display =
       "none";
+
 
     results.forEach(event => {
 
@@ -1659,6 +2116,7 @@ type:
           "tr"
         );
 
+
       row.appendChild(
         createCell(
           event.date,
@@ -1666,11 +2124,13 @@ type:
         )
       );
 
+
       row.appendChild(
         createCell(
           event.semester
         )
       );
+
 
       row.appendChild(
         createCell(
@@ -1678,29 +2138,44 @@ type:
         )
       );
 
+
       row.appendChild(
         createCell(
           event.topic
         )
       );
 
+
+      /*
+        Facilitator is displayed First Last.
+      */
+
       row.appendChild(
         createCell(
-          event.facilitator
+          displayPersonName(
+            event.facilitator
+          )
         )
       );
+
 
       if (
         !personMode
       ) {
 
+        /*
+          Outlook-ready participant list:
+          First Last; First Last; First Last
+        */
+
         row.appendChild(
           createCell(
-            event.participants.join(
-              ", "
+            displayParticipantList(
+              event.participants
             )
           )
         );
+
 
         row.appendChild(
           createCell(
@@ -1712,8 +2187,12 @@ type:
         );
       }
 
-      body.appendChild(row);
+
+      body.appendChild(
+        row
+      );
     });
+
 
     status.textContent =
       "Showing " +
@@ -1737,10 +2216,17 @@ type:
     selectedPerson =
       person;
 
+
+    /*
+      Only actual event participation counts.
+
+      Membership in FT Cohort or CTL Blue
+      never creates a session count.
+    */
+
     const results =
       events.filter(
         event =>
-          !event.rosterOnly &&
           passesFilters(event) &&
           eventIncludesPerson(
             event,
@@ -1748,12 +2234,15 @@ type:
           )
       );
 
+
     hidePersonChoices();
+
 
     displayPersonSummary(
       person,
       results.length
     );
+
 
     renderResults(
       results,
@@ -1772,6 +2261,7 @@ type:
     hidePersonChoices();
     hidePersonSummary();
 
+
     const results =
       events.filter(
         event =>
@@ -1781,6 +2271,7 @@ type:
             query
           )
       );
+
 
     renderResults(
       results,
@@ -1907,8 +2398,10 @@ type:
     selectedPerson =
       "";
 
+
     hidePersonChoices();
     hidePersonSummary();
+
 
     body.innerHTML =
       "";
@@ -1918,8 +2411,10 @@ type:
     empty.style.display =
       "none";
 
+
     status.textContent =
       "Enter a search term or select a filter to begin.";
+
 
     searchInput.focus();
   }
@@ -1990,56 +2485,59 @@ type:
 
 
   /* =========================================================
-     LOAD ALL FIVE DATASETS
+     LOAD ALL SIX DATASETS
      ========================================================= */
 
   try {
 
     const [
       participationResponse,
-      membershipResponse,
+      ftMembershipResponse,
       cohortAttendanceResponse,
       irtResponse,
-      officeHoursResponse
+      officeHoursResponse,
+      blueResponse
     ] = await Promise.all([
 
       fetch(
         "CTL_Participation_Master.csv",
         {
-          cache:
-            "no-store"
+          cache: "no-store"
         }
       ),
 
       fetch(
         "CTL_Full_Time_Cohort.csv",
         {
-          cache:
-            "no-store"
+          cache: "no-store"
         }
       ),
 
       fetch(
         "CTL_Full_Time_Cohort_Attendance.csv",
         {
-          cache:
-            "no-store"
+          cache: "no-store"
         }
       ),
 
       fetch(
         "CTL_Instructor_Readiness_Training.csv",
         {
-          cache:
-            "no-store"
+          cache: "no-store"
         }
       ),
 
       fetch(
         "CTL_Office_Hours.csv",
         {
-          cache:
-            "no-store"
+          cache: "no-store"
+        }
+      ),
+
+      fetch(
+        "CTL_Blue.csv",
+        {
+          cache: "no-store"
         }
       )
 
@@ -2056,7 +2554,7 @@ type:
 
 
     if (
-      !membershipResponse.ok
+      !ftMembershipResponse.ok
     ) {
       throw new Error(
         "Full-Time Cohort membership data could not be loaded."
@@ -2091,27 +2589,59 @@ type:
     }
 
 
+    if (
+      !blueResponse.ok
+    ) {
+      throw new Error(
+        "CTL Blue enrollment data could not be loaded."
+      );
+    }
+
+
     const [
       participationText,
-      membershipText,
+      ftMembershipText,
       cohortAttendanceText,
       irtText,
-      officeHoursText
+      officeHoursText,
+      blueText
     ] = await Promise.all([
 
       participationResponse.text(),
-      membershipResponse.text(),
+
+      ftMembershipResponse.text(),
+
       cohortAttendanceResponse.text(),
+
       irtResponse.text(),
-      officeHoursResponse.text()
+
+      officeHoursResponse.text(),
+
+      blueResponse.text()
 
     ]);
 
 
-    loadCohortMembershipCSV(
-      membershipText
+    /*
+      Load program enrollment separately
+      from participation.
+    */
+
+    loadMembershipCSV(
+      ftMembershipText,
+      ftCohortMembership
     );
 
+
+    loadMembershipCSV(
+      blueText,
+      ctlBlueMembership
+    );
+
+
+    /*
+      Load actual participation.
+    */
 
     const participationData =
       loadParticipationCSV(
@@ -2122,12 +2652,6 @@ type:
     const cohortEvents =
       loadCohortAttendanceCSV(
         cohortAttendanceText
-      );
-
-
-    const cohortRosterEvents =
-      buildCohortRosterEvents(
-        cohortEvents
       );
 
 
@@ -2144,10 +2668,16 @@ type:
       );
 
 
+    /*
+      Only actual events belong here.
+
+      Neither FT Cohort enrollment nor
+      CTL Blue enrollment creates an event.
+    */
+
     events = [
       ...participationData.events,
       ...cohortEvents,
-      ...cohortRosterEvents,
       ...irtEvents,
       ...officeHoursEvents
     ];
@@ -2176,6 +2706,7 @@ type:
     empty.style.display =
       "none";
 
+
     status.textContent =
       "Enter a search term or select a filter to begin.";
 
@@ -2183,6 +2714,7 @@ type:
   } catch (error) {
 
     console.error(error);
+
 
     status.textContent =
       "Participation data could not be loaded.";
