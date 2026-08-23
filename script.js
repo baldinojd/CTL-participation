@@ -1,3 +1,20 @@
+
+
+Skip to content
+Using Gmail with screen readers
+1 of 1
+CTL script.txt
+Inbox
+
+John Baldino <baldinojd@gmail.com>
+Attachments
+10:57 AM (0 minutes ago)
+to me
+
+Attached is the revised CTL script as a plain-text file so you can download it without the browser attachment issue.
+
+ One attachment
+  •  Scanned by Gmail
 document.addEventListener("DOMContentLoaded", async function () {
 
   const searchInput = document.getElementById("search");
@@ -2485,212 +2502,441 @@ document.addEventListener("DOMContentLoaded", async function () {
 
 
   /* =========================================================
-     LOAD ALL SIX DATASETS
+     SUPABASE DATA LAYER
      ========================================================= */
 
+  function canonicalNameFromPersonRecord(person) {
+    if (!person) {
+      return "";
+    }
+
+    const first = String(person.first_name || "").trim();
+    const last = String(person.last_name || "").trim();
+
+    if (last && first) {
+      return `${last}, ${first}`;
+    }
+
+    return last || first;
+  }
+
+
+  function formatDatabaseDate(value, eventType) {
+    if (!value) {
+      return eventType === "Office Hours" ? "Various" : "";
+    }
+
+    const parts = String(value).split("-");
+
+    if (parts.length !== 3) {
+      return String(value);
+    }
+
+    const [year, month, day] = parts.map(Number);
+
+    if (!year || !month || !day) {
+      return String(value);
+    }
+
+    return new Intl.DateTimeFormat(
+      "en-US",
+      {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        timeZone: "UTC"
+      }
+    ).format(
+      new Date(Date.UTC(year, month - 1, day))
+    );
+  }
+
+
+  function formatUpdatedTimestamp(value) {
+    if (!value) {
+      return "";
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return "";
+    }
+
+    return new Intl.DateTimeFormat(
+      "en-US",
+      {
+        month: "numeric",
+        day: "numeric",
+        year: "numeric"
+      }
+    ).format(date);
+  }
+
+
+  async function selectAllRows(
+    table,
+    columns,
+    orderBy = "id"
+  ) {
+    const pageSize = 1000;
+    let from = 0;
+    let allRows = [];
+
+    while (true) {
+      const {
+        data,
+        error
+      } = await window.ctlSupabase
+        .from(table)
+        .select(columns)
+        .order(
+          orderBy,
+          {
+            ascending: true
+          }
+        )
+        .range(
+          from,
+          from + pageSize - 1
+        );
+
+      if (error) {
+        throw new Error(
+          `${table} could not be loaded: ${error.message}`
+        );
+      }
+
+      const rows = data || [];
+
+      allRows.push(...rows);
+
+      if (rows.length < pageSize) {
+        break;
+      }
+
+      from += pageSize;
+    }
+
+    return allRows;
+  }
+
+
+  function addMembershipRecord(
+    membershipMap,
+    person,
+    academicYear
+  ) {
+    if (
+      !person ||
+      !academicYear
+    ) {
+      return;
+    }
+
+    const key =
+      personKey(person);
+
+    if (
+      !membershipMap.has(key)
+    ) {
+      membershipMap.set(
+        key,
+        {
+          name: person,
+          years: new Set()
+        }
+      );
+    }
+
+    membershipMap
+      .get(key)
+      .years
+      .add(academicYear);
+  }
+
+
   try {
+    if (
+      !window.ctlSupabase
+    ) {
+      throw new Error(
+        "Supabase client is not available."
+      );
+    }
+
+    status.textContent =
+      "Loading participation data…";
+
 
     const [
-      participationResponse,
-      ftMembershipResponse,
-      cohortAttendanceResponse,
-      irtResponse,
-      officeHoursResponse,
-      blueResponse
+      peopleRows,
+      eventRows,
+      attendanceRows,
+      enrollmentRows
     ] = await Promise.all([
-
-      fetch(
-        "CTL_Participation_Master.csv",
-        {
-          cache: "no-store"
-        }
+      selectAllRows(
+        "people",
+        "id, first_name, last_name, email, created_at, updated_at"
       ),
 
-      fetch(
-        "CTL_Full_Time_Cohort.csv",
-        {
-          cache: "no-store"
-        }
+      selectAllRows(
+        "events",
+        "id, event_date, semester, academic_year, event_type, topic, facilitator_id, created_at, updated_at"
       ),
 
-      fetch(
-        "CTL_Full_Time_Cohort_Attendance.csv",
-        {
-          cache: "no-store"
-        }
+      selectAllRows(
+        "attendance",
+        "id, event_id, person_id, created_at"
       ),
 
-      fetch(
-        "CTL_Instructor_Readiness_Training.csv",
-        {
-          cache: "no-store"
-        }
-      ),
-
-      fetch(
-        "CTL_Office_Hours.csv",
-        {
-          cache: "no-store"
-        }
-      ),
-
-      fetch(
-        "CTL_Blue.csv",
-        {
-          cache: "no-store"
-        }
+      selectAllRows(
+        "program_enrollments",
+        "id, person_id, program_name, academic_year, created_at, updated_at"
       )
-
-    ]);
-
-
-    if (
-      !participationResponse.ok
-    ) {
-      throw new Error(
-        "CTL participation data could not be loaded."
-      );
-    }
-
-
-    if (
-      !ftMembershipResponse.ok
-    ) {
-      throw new Error(
-        "Full-Time Cohort membership data could not be loaded."
-      );
-    }
-
-
-    if (
-      !cohortAttendanceResponse.ok
-    ) {
-      throw new Error(
-        "Full-Time Cohort attendance data could not be loaded."
-      );
-    }
-
-
-    if (
-      !irtResponse.ok
-    ) {
-      throw new Error(
-        "Instructor Readiness Training data could not be loaded."
-      );
-    }
-
-
-    if (
-      !officeHoursResponse.ok
-    ) {
-      throw new Error(
-        "Office Hours data could not be loaded."
-      );
-    }
-
-
-    if (
-      !blueResponse.ok
-    ) {
-      throw new Error(
-        "CTL Blue enrollment data could not be loaded."
-      );
-    }
-
-
-    const [
-      participationText,
-      ftMembershipText,
-      cohortAttendanceText,
-      irtText,
-      officeHoursText,
-      blueText
-    ] = await Promise.all([
-
-      participationResponse.text(),
-
-      ftMembershipResponse.text(),
-
-      cohortAttendanceResponse.text(),
-
-      irtResponse.text(),
-
-      officeHoursResponse.text(),
-
-      blueResponse.text()
-
     ]);
 
 
     /*
-      Load program enrollment separately
-      from participation.
+      Build one canonical Last, First name
+      for every person in the database.
     */
 
-    loadMembershipCSV(
-      ftMembershipText,
-      ftCohortMembership
-    );
+    const peopleById =
+      new Map();
 
-
-    loadMembershipCSV(
-      blueText,
-      ctlBlueMembership
+    peopleRows.forEach(
+      person => {
+        peopleById.set(
+          person.id,
+          canonicalNameFromPersonRecord(
+            person
+          )
+        );
+      }
     );
 
 
     /*
-      Load actual participation.
+      Program membership remains separate
+      from event participation.
     */
 
-    const participationData =
-      loadParticipationCSV(
-        participationText
-      );
+    ftCohortMembership.clear();
+    ctlBlueMembership.clear();
+
+    enrollmentRows.forEach(
+      enrollment => {
+        const person =
+          peopleById.get(
+            enrollment.person_id
+          ) || "";
+
+        if (
+          enrollment.program_name ===
+          "Full-Time Cohort"
+        ) {
+          addMembershipRecord(
+            ftCohortMembership,
+            person,
+            enrollment.academic_year
+          );
+        }
+
+        if (
+          enrollment.program_name ===
+          "CTL Blue"
+        ) {
+          addMembershipRecord(
+            ctlBlueMembership,
+            person,
+            enrollment.academic_year
+          );
+        }
+      }
+    );
 
 
-    const cohortEvents =
-      loadCohortAttendanceCSV(
-        cohortAttendanceText
-      );
+    /*
+      Group attendance by event.
+    */
+
+    const participantsByEvent =
+      new Map();
+
+    attendanceRows.forEach(
+      attendance => {
+        const person =
+          peopleById.get(
+            attendance.person_id
+          );
+
+        if (!person) {
+          return;
+        }
+
+        if (
+          !participantsByEvent.has(
+            attendance.event_id
+          )
+        ) {
+          participantsByEvent.set(
+            attendance.event_id,
+            new Set()
+          );
+        }
+
+        participantsByEvent
+          .get(attendance.event_id)
+          .add(person);
+      }
+    );
 
 
-    const irtEvents =
-      loadIRTCSV(
-        irtText
-      );
+    /*
+      Convert relational event records to
+      the same event objects used by the
+      existing search/rendering interface.
+    */
 
+    events =
+      eventRows.map(
+        event => {
+          const facilitator =
+            peopleById.get(
+              event.facilitator_id
+            ) || "";
 
-    const officeHoursEvents =
-      loadOfficeHoursCSV(
-        officeHoursText,
-        participationData.events
+          const participantSet =
+            participantsByEvent.get(
+              event.id
+            ) || new Set();
+
+          /*
+            Defensive check: even if bad data
+            is ever inserted later, do not count
+            the facilitator twice.
+          */
+
+          if (facilitator) {
+            participantSet.delete(
+              facilitator
+            );
+          }
+
+          const participants =
+            Array
+              .from(participantSet)
+              .sort(
+                (a, b) =>
+                  displayPersonName(a)
+                    .localeCompare(
+                      displayPersonName(b)
+                    )
+              );
+
+          return {
+            id:
+              event.id,
+
+            date:
+              formatDatabaseDate(
+                event.event_date,
+                event.event_type
+              ),
+
+            semester:
+              event.semester || "",
+
+            academicYear:
+              event.academic_year || "",
+
+            topic:
+              event.topic || "",
+
+            facilitator:
+              facilitator,
+
+            participants:
+              participants,
+
+            total:
+              participants.length +
+              (facilitator ? 1 : 0),
+
+            type:
+              event.event_type || "",
+
+            source:
+              "Supabase"
+          };
+        }
       );
 
 
     /*
-      Only actual events belong here.
-
-      Neither FT Cohort enrollment nor
-      CTL Blue enrollment creates an event.
+      Find the latest database activity date
+      for the small "Data updated" indicator.
     */
 
-    events = [
-      ...participationData.events,
-      ...cohortEvents,
-      ...irtEvents,
-      ...officeHoursEvents
-    ];
+    const timestamps = [
+      ...peopleRows.map(
+        row =>
+          row.updated_at ||
+          row.created_at
+      ),
+
+      ...eventRows.map(
+        row =>
+          row.updated_at ||
+          row.created_at
+      ),
+
+      ...attendanceRows.map(
+        row =>
+          row.created_at
+      ),
+
+      ...enrollmentRows.map(
+        row =>
+          row.updated_at ||
+          row.created_at
+      )
+    ]
+      .filter(Boolean)
+      .map(
+        value =>
+          new Date(value)
+      )
+      .filter(
+        date =>
+          !Number.isNaN(
+            date.getTime()
+          )
+      );
+
+    const latestTimestamp =
+      timestamps.length
+        ? new Date(
+            Math.max(
+              ...timestamps.map(
+                date =>
+                  date.getTime()
+              )
+            )
+          )
+        : null;
 
 
     if (
       updatedDate
     ) {
-
       updatedDate.textContent =
-        participationData.updated
+        latestTimestamp
           ? "Data updated: " +
-            participationData.updated
+            formatUpdatedTimestamp(
+              latestTimestamp
+            )
           : "Data updated: —";
     }
 
@@ -2715,9 +2961,10 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     console.error(error);
 
-
     status.textContent =
       "Participation data could not be loaded.";
   }
 
 });
+script.txt
+Displaying script.txt.
