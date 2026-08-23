@@ -25,6 +25,9 @@ document.addEventListener("DOMContentLoaded", async function () {
   const adminCancelBtn = document.getElementById("adminCancelBtn");
   const adminSubmitBtn = document.getElementById("adminSubmitBtn");
 
+  let currentAdminUser = null;
+  let currentAdminAuthorized = false;
+
   /* =========================================================
      ADMIN AUTHENTICATION
      Sign-in only. Editing controls are intentionally not
@@ -32,12 +35,129 @@ document.addEventListener("DOMContentLoaded", async function () {
      ========================================================= */
 
   function showSignedOutState() {
+    currentAdminUser = null;
+    currentAdminAuthorized = false;
+
     if (adminIdentity) {
       adminIdentity.textContent = "";
       adminIdentity.style.display = "none";
     }
 
     if (adminSignInBtn) {
+      adminSignInBtn.style.display = "";
+    }
+
+    if (adminSignOutBtn) {
+      adminSignOutBtn.style.display = "none";
+    }
+  }
+
+  function showSignedInState(user, isAuthorized = false) {
+    currentAdminUser = user || null;
+    currentAdminAuthorized = Boolean(isAuthorized);
+
+    if (adminIdentity) {
+      const label =
+        user?.user_metadata?.display_name ||
+        user?.user_metadata?.full_name ||
+        user?.email ||
+        "Admin";
+
+      adminIdentity.textContent =
+        "Signed in: " +
+        label +
+        (currentAdminAuthorized ? " (Admin)" : " (Not authorized)");
+
+      adminIdentity.style.display = "";
+    }
+
+    if (adminSignInBtn) {
+      adminSignInBtn.style.display = "none";
+    }
+
+    if (adminSignOutBtn) {
+      adminSignOutBtn.style.display = "";
+    }
+  }
+
+  async function isAuthorizedEditor(user) {
+    if (
+      !window.ctlSupabase ||
+      !user?.id
+    ) {
+      return false;
+    }
+
+    const {
+      data,
+      error
+    } = await window.ctlSupabase
+      .from("authorized_editors")
+      .select("auth_user_id, display_name, active")
+      .eq("auth_user_id", user.id)
+      .eq("active", true)
+      .maybeSingle();
+
+    if (error) {
+      console.error(
+        "Authorized-editor check failed:",
+        error
+      );
+      return false;
+    }
+
+    return Boolean(data);
+  }
+
+  async function refreshAdminState(user) {
+    if (!user) {
+      showSignedOutState();
+      return;
+    }
+
+    const authorized =
+      await isAuthorizedEditor(user);
+
+    showSignedInState(
+      user,
+      authorized
+    );
+  }
+
+  async function initializeAdminAuth() {
+    if (!window.ctlSupabase) {
+      showSignedOutState();
+      return;
+    }
+
+    const {
+      data: { session }
+    } = await window.ctlSupabase.auth.getSession();
+
+    await refreshAdminState(
+      session?.user || null
+    );
+
+    window.ctlSupabase.auth.onAuthStateChange(
+      function (_event, session) {
+        /*
+          Do not await Supabase queries directly inside
+          the auth callback. Run the authorization refresh
+          after the callback returns.
+        */
+        setTimeout(
+          function () {
+            refreshAdminState(
+              session?.user || null
+            );
+          },
+          0
+        );
+      }
+    );
+  }
+
+  if (adminSignInBtn) {
       adminSignInBtn.style.display = "";
     }
 
@@ -142,7 +262,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
           adminPassword.value = "";
           adminLoginDialog.close();
-          showSignedInState(data.user);
+          await refreshAdminState(data.user);
 
         } catch (error) {
           console.error(error);
