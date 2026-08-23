@@ -50,7 +50,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     if (adminSignOutBtn) {
       adminSignOutBtn.style.display = "none";
     }
-  }
+  if (adminWorkspace) {
+  adminWorkspace.style.display = "none";
+}}
 
   function showSignedInState(user, isAuthorized = false) {
     currentAdminUser = user || null;
@@ -77,7 +79,9 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     if (adminSignOutBtn) {
       adminSignOutBtn.style.display = "";
-    }
+    }if (adminWorkspace) {
+  adminWorkspace.style.display = currentAdminAuthorized ? "" : "none";
+}
   }
 
   async function isAuthorizedEditor(user) {
