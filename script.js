@@ -1,20 +1,3 @@
-
-
-Skip to content
-Using Gmail with screen readers
-1 of 1
-CTL script.txt
-Inbox
-
-John Baldino <baldinojd@gmail.com>
-Attachments
-10:57 AM (0 minutes ago)
-to me
-
-Attached is the revised CTL script as a plain-text file so you can download it without the browser attachment issue.
-
- One attachment
-  •  Scanned by Gmail
 document.addEventListener("DOMContentLoaded", async function () {
 
   const searchInput = document.getElementById("search");
@@ -2966,5 +2949,3 @@ document.addEventListener("DOMContentLoaded", async function () {
   }
 
 });
-script.txt
-Displaying script.txt.
