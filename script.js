@@ -14,6 +14,167 @@ document.addEventListener("DOMContentLoaded", async function () {
   const personChoices = document.getElementById("personChoices");
   const personSummary = document.getElementById("personSummary");
 
+  const adminSignInBtn = document.getElementById("adminSignInBtn");
+  const adminSignOutBtn = document.getElementById("adminSignOutBtn");
+  const adminIdentity = document.getElementById("adminIdentity");
+  const adminLoginDialog = document.getElementById("adminLoginDialog");
+  const adminLoginForm = document.getElementById("adminLoginForm");
+  const adminEmail = document.getElementById("adminEmail");
+  const adminPassword = document.getElementById("adminPassword");
+  const adminLoginMessage = document.getElementById("adminLoginMessage");
+  const adminCancelBtn = document.getElementById("adminCancelBtn");
+  const adminSubmitBtn = document.getElementById("adminSubmitBtn");
+
+  /* =========================================================
+     ADMIN AUTHENTICATION
+     Sign-in only. Editing controls are intentionally not
+     enabled in this version.
+     ========================================================= */
+
+  function showSignedOutState() {
+    if (adminIdentity) {
+      adminIdentity.textContent = "";
+      adminIdentity.style.display = "none";
+    }
+
+    if (adminSignInBtn) {
+      adminSignInBtn.style.display = "";
+    }
+
+    if (adminSignOutBtn) {
+      adminSignOutBtn.style.display = "none";
+    }
+  }
+
+  function showSignedInState(user) {
+    if (adminIdentity) {
+      adminIdentity.textContent =
+        "Signed in: " + (user?.email || "Admin");
+      adminIdentity.style.display = "";
+    }
+
+    if (adminSignInBtn) {
+      adminSignInBtn.style.display = "none";
+    }
+
+    if (adminSignOutBtn) {
+      adminSignOutBtn.style.display = "";
+    }
+  }
+
+  async function initializeAdminAuth() {
+    if (!window.ctlSupabase) {
+      showSignedOutState();
+      return;
+    }
+
+    const {
+      data: { session }
+    } = await window.ctlSupabase.auth.getSession();
+
+    if (session?.user) {
+      showSignedInState(session.user);
+    } else {
+      showSignedOutState();
+    }
+
+    window.ctlSupabase.auth.onAuthStateChange(
+      function (_event, session) {
+        if (session?.user) {
+          showSignedInState(session.user);
+        } else {
+          showSignedOutState();
+        }
+      }
+    );
+  }
+
+  if (adminSignInBtn) {
+    adminSignInBtn.addEventListener(
+      "click",
+      function () {
+        adminLoginMessage.textContent = "";
+        adminPassword.value = "";
+
+        if (!adminEmail.value) {
+          adminEmail.value = "baldinoj@lackawanna.edu";
+        }
+
+        adminLoginDialog.showModal();
+        adminEmail.focus();
+      }
+    );
+  }
+
+  if (adminCancelBtn) {
+    adminCancelBtn.addEventListener(
+      "click",
+      function () {
+        adminLoginDialog.close();
+      }
+    );
+  }
+
+  if (adminLoginForm) {
+    adminLoginForm.addEventListener(
+      "submit",
+      async function (event) {
+        event.preventDefault();
+
+        adminLoginMessage.textContent = "";
+        adminSubmitBtn.disabled = true;
+        adminSubmitBtn.textContent = "Signing In…";
+
+        try {
+          const { data, error } =
+            await window.ctlSupabase.auth.signInWithPassword({
+              email: adminEmail.value.trim(),
+              password: adminPassword.value
+            });
+
+          if (error) {
+            throw error;
+          }
+
+          if (!data?.user) {
+            throw new Error("Sign-in did not return a user.");
+          }
+
+          adminPassword.value = "";
+          adminLoginDialog.close();
+          showSignedInState(data.user);
+
+        } catch (error) {
+          console.error(error);
+          adminLoginMessage.textContent =
+            error?.message || "Sign-in failed.";
+        } finally {
+          adminSubmitBtn.disabled = false;
+          adminSubmitBtn.textContent = "Sign In";
+        }
+      }
+    );
+  }
+
+  if (adminSignOutBtn) {
+    adminSignOutBtn.addEventListener(
+      "click",
+      async function () {
+        const { error } =
+          await window.ctlSupabase.auth.signOut();
+
+        if (error) {
+          console.error(error);
+          return;
+        }
+
+        showSignedOutState();
+      }
+    );
+  }
+
+  await initializeAdminAuth();
+
   const FT_COHORT_FACILITATOR = "Baldino, John";
   const IRT_FACILITATOR = "Baldino, John";
   const OFFICE_HOURS_FACILITATOR = "Baldino, John";
