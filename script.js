@@ -24,14 +24,15 @@ document.addEventListener("DOMContentLoaded", async function () {
   const adminLoginMessage = document.getElementById("adminLoginMessage");
   const adminCancelBtn = document.getElementById("adminCancelBtn");
   const adminSubmitBtn = document.getElementById("adminSubmitBtn");
+  const adminWorkspace = document.getElementById("adminWorkspace");
 
   let currentAdminUser = null;
   let currentAdminAuthorized = false;
 
   /* =========================================================
      ADMIN AUTHENTICATION
-     Sign-in only. Editing controls are intentionally not
-     enabled in this version.
+     Authorized users see the Admin Tools workspace.
+     Editing controls are added separately.
      ========================================================= */
 
   function showSignedOutState() {
@@ -50,9 +51,11 @@ document.addEventListener("DOMContentLoaded", async function () {
     if (adminSignOutBtn) {
       adminSignOutBtn.style.display = "none";
     }
-  if (adminWorkspace) {
-  adminWorkspace.style.display = "none";
-}}
+
+    if (adminWorkspace) {
+      adminWorkspace.style.display = "none";
+    }
+  }
 
   function showSignedInState(user, isAuthorized = false) {
     currentAdminUser = user || null;
@@ -79,9 +82,12 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     if (adminSignOutBtn) {
       adminSignOutBtn.style.display = "";
-    }if (adminWorkspace) {
-  adminWorkspace.style.display = currentAdminAuthorized ? "" : "none";
-}
+    }
+
+    if (adminWorkspace) {
+      adminWorkspace.style.display =
+        currentAdminAuthorized ? "" : "none";
+    }
   }
 
   async function isAuthorizedEditor(user) {
@@ -157,58 +163,6 @@ document.addEventListener("DOMContentLoaded", async function () {
           },
           0
         );
-      }
-    );
-  
-
-  if (adminSignInBtn) {
-      adminSignInBtn.style.display = "";
-    }
-
-    if (adminSignOutBtn) {
-      adminSignOutBtn.style.display = "none";
-    }
-  }
-
-  function showSignedInState(user) {
-    if (adminIdentity) {
-      adminIdentity.textContent =
-        "Signed in: " + (user?.email || "Admin");
-      adminIdentity.style.display = "";
-    }
-
-    if (adminSignInBtn) {
-      adminSignInBtn.style.display = "none";
-    }
-
-    if (adminSignOutBtn) {
-      adminSignOutBtn.style.display = "";
-    }
-  }
-
-  async function initializeAdminAuth() {
-    if (!window.ctlSupabase) {
-      showSignedOutState();
-      return;
-    }
-
-    const {
-      data: { session }
-    } = await window.ctlSupabase.auth.getSession();
-
-    if (session?.user) {
-      showSignedInState(session.user);
-    } else {
-      showSignedOutState();
-    }
-
-    window.ctlSupabase.auth.onAuthStateChange(
-      function (_event, session) {
-        if (session?.user) {
-          showSignedInState(session.user);
-        } else {
-          showSignedOutState();
-        }
       }
     );
   }
