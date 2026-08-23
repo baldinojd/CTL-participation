@@ -155,7 +155,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         );
       }
     );
-  }
+  
 
   if (adminSignInBtn) {
       adminSignInBtn.style.display = "";
