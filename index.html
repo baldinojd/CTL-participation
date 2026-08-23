@@ -179,6 +179,16 @@
 <footer>
   Center for Teaching and Learning · Lackawanna College
 </footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+  const SUPABASE_URL = "https://qsbivlkqukxtnwzqnchx.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_HD_imKU-Jr3PXcB1T2PgqA_QzlOOZmn";
+  window.ctlSupabase = supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY
+  );
+</script>
 
 <script src="script.js"></script>
 
