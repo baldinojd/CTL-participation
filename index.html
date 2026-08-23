@@ -34,8 +34,85 @@
         Data updated: —
       </div>
 
+      <div class="admin-auth">
+        <span
+          id="adminIdentity"
+          class="admin-identity"
+          style="display: none;"
+        ></span>
+
+        <button
+          id="adminSignInBtn"
+          type="button"
+          class="admin-link"
+        >
+          Admin Sign In
+        </button>
+
+        <button
+          id="adminSignOutBtn"
+          type="button"
+          class="admin-link"
+          style="display: none;"
+        >
+          Sign Out
+        </button>
+      </div>
+
     </div>
   </header>
+
+  <dialog id="adminLoginDialog" class="admin-login-dialog">
+    <form id="adminLoginForm" method="dialog">
+      <div class="admin-login-heading">
+        Admin Sign In
+      </div>
+
+      <div class="admin-login-field">
+        <label for="adminEmail">Email</label>
+        <input
+          id="adminEmail"
+          type="email"
+          autocomplete="username"
+          required
+        >
+      </div>
+
+      <div class="admin-login-field">
+        <label for="adminPassword">Password</label>
+        <input
+          id="adminPassword"
+          type="password"
+          autocomplete="current-password"
+          required
+        >
+      </div>
+
+      <div
+        id="adminLoginMessage"
+        class="admin-login-message"
+        aria-live="polite"
+      ></div>
+
+      <div class="admin-login-actions">
+        <button
+          id="adminCancelBtn"
+          type="button"
+          class="secondary"
+        >
+          Cancel
+        </button>
+
+        <button
+          id="adminSubmitBtn"
+          type="submit"
+          class="primary"
+        >
+          Sign In
+        </button>
+      </div>
+    </form>
+  </dialog>
 
   <main>
 
@@ -198,12 +275,107 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_HD_imKU-Jr3PXcB1T2PgqA_QzlOOZmn
      Print | Save as PDF | Save as CSV (Excel)
      ========================================================= -->
 
-<!-- =========================================================
-     CTL RESULTS EXPORT TOOLS
-     Print | Save as PDF | Save as CSV (Excel)
-     ========================================================= -->
-
 <style>
+
+  /* ADMIN SIGN-IN */
+
+  .admin-auth {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+  }
+
+  .admin-identity {
+    font-size: 0.86rem;
+    color: #555555;
+  }
+
+  .admin-link {
+    height: 34px;
+    padding: 0 12px;
+    border: 1px solid #aeb7c1;
+    border-radius: 5px;
+    background: #ffffff;
+    color: #263b52;
+    font-size: 0.84rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .admin-link:hover {
+    background: #f2f4f6;
+  }
+
+  .admin-login-dialog {
+    width: min(430px, calc(100% - 32px));
+    border: 1px solid #c9cfd6;
+    border-radius: 8px;
+    padding: 0;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+  }
+
+  .admin-login-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.35);
+  }
+
+  .admin-login-dialog form {
+    padding: 24px;
+  }
+
+  .admin-login-heading {
+    margin-bottom: 20px;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #263b52;
+  }
+
+  .admin-login-field {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 15px;
+  }
+
+  .admin-login-field label {
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+
+  .admin-login-field input {
+    width: 100%;
+    height: 44px;
+    padding: 0 12px;
+    border: 1px solid #b9c0c8;
+    border-radius: 5px;
+    font-size: 1rem;
+  }
+
+  .admin-login-message {
+    min-height: 20px;
+    margin: 4px 0 14px;
+    color: #9b1c1c;
+    font-size: 0.88rem;
+  }
+
+  .admin-login-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  @media (max-width: 900px) {
+    .admin-auth {
+      width: 100%;
+    }
+  }
+
+  @media print {
+    .admin-auth,
+    .admin-login-dialog {
+      display: none !important;
+    }
+  }
 
   #exportTools {
     display: none;
@@ -855,8 +1027,6 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_HD_imKU-Jr3PXcB1T2PgqA_QzlOOZmn
   );
 
 })();
-
-</script>
 
 </script>
 
