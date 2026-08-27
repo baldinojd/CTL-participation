@@ -2655,11 +2655,19 @@ document.addEventListener("DOMContentLoaded", async function () {
       await refreshAdminReferenceData();
 
       /*
-        Reload the public search data so the merged identity
-        is reflected immediately without requiring a page reload.
+        The public search data is loaded during page startup,
+        not through a reusable loadData() function. Reload the
+        page after a successful merge so every search structure
+        is rebuilt from the updated Supabase records.
       */
-      await loadData();
-      populateFilters();
+      window.setTimeout(
+        function () {
+          window.location.reload();
+        },
+        500
+      );
+
+      return;
 
     } catch (error) {
       console.error(error);
