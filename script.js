@@ -2444,16 +2444,6 @@ document.addEventListener("DOMContentLoaded", async function () {
             };
           });
 
-      const programMatches =
-        programMemberships
-          .filter(
-            membership =>
-              personMatchesQuery(
-                membership.name,
-                query
-              )
-          );
-
       const escapeJson =
         value =>
           escapeAdminHtml(
@@ -2474,8 +2464,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         <h4>Matching event records (${eventMatches.length})</h4>
         <pre>${escapeJson(eventMatches)}</pre>
 
-        <h4>Matching program memberships (${programMatches.length})</h4>
-        <pre>${escapeJson(programMatches)}</pre>
       `;
 
     } catch (error) {
