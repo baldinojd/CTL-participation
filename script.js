@@ -263,6 +263,7 @@ document.addEventListener("DOMContentLoaded", async function () {
           <button type="button" class="ctl-admin-tab" data-admin-panel="bulkEventsPanel">Bulk Semester Events</button>
           <button type="button" class="ctl-admin-tab" data-admin-panel="backupDataPanel">Backup Data</button>
           <button type="button" class="ctl-admin-tab" data-admin-panel="manageAdminsPanel">Manage Administrators</button>
+          <button type="button" class="ctl-admin-tab" data-admin-panel="mergePeoplePanel">Merge People</button>
         </div>
 
         <div id="adminToolMessage" class="ctl-admin-message" aria-live="polite"></div>
@@ -381,6 +382,34 @@ document.addEventListener("DOMContentLoaded", async function () {
           </form>
 
           <div id="adminManagerList" class="ctl-admin-preview"></div>
+        </section>
+
+        <section id="mergePeoplePanel" class="ctl-admin-panel">
+          <h3>Merge People</h3>
+          <p>Combine two records that belong to the same person. Choose the name you want to keep. Attendance, facilitation, and program enrollment records will be preserved.</p>
+
+          <div class="ctl-admin-grid">
+            <div class="ctl-admin-field">
+              <label for="mergePersonA">Person 1</label>
+              <select id="mergePersonA"></select>
+            </div>
+            <div class="ctl-admin-field">
+              <label for="mergePersonB">Person 2</label>
+              <select id="mergePersonB"></select>
+            </div>
+          </div>
+
+          <div class="ctl-admin-field ctl-admin-wide">
+            <label for="mergeKeepPerson">Name to keep</label>
+            <select id="mergeKeepPerson" disabled>
+              <option value="">Select two people first…</option>
+            </select>
+          </div>
+
+          <div class="ctl-admin-actions">
+            <button id="mergePeopleBtn" type="button" class="ctl-admin-danger" disabled>Merge People</button>
+          </div>
+          <small>This action permanently removes the redundant person record after moving its relationships to the retained person.</small>
         </section>
 
         <datalist id="adminAyList"></datalist>
@@ -856,6 +885,107 @@ document.addEventListener("DOMContentLoaded", async function () {
   }
 
 
+  function adminNameParts(person) {
+    return {
+      first: normalizeAdminName(person?.first_name || ""),
+      last: normalizeAdminName(person?.last_name || "")
+    };
+  }
+
+
+  function adminLevenshtein(a, b) {
+    const x = String(a || "");
+    const y = String(b || "");
+    const dp = Array.from(
+      { length: x.length + 1 },
+      () => Array(y.length + 1).fill(0)
+    );
+
+    for (let i = 0; i <= x.length; i++) dp[i][0] = i;
+    for (let j = 0; j <= y.length; j++) dp[0][j] = j;
+
+    for (let i = 1; i <= x.length; i++) {
+      for (let j = 1; j <= y.length; j++) {
+        dp[i][j] = Math.min(
+          dp[i - 1][j] + 1,
+          dp[i][j - 1] + 1,
+          dp[i - 1][j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1)
+        );
+      }
+    }
+
+    return dp[x.length][y.length];
+  }
+
+
+  const ADMIN_NICKNAME_GROUPS = [
+    ["bill", "william", "will"],
+    ["charlie", "charles", "chuck"],
+    ["maggie", "margaret", "meg", "peggy"],
+    ["mike", "michael"],
+    ["bob", "robert", "rob"],
+    ["jim", "james"],
+    ["joe", "joseph"],
+    ["liz", "beth", "elizabeth"],
+    ["kate", "katie", "katherine", "catherine"],
+    ["julie", "julianne", "juliana"]
+  ];
+
+
+  function adminFirstNamesRelated(a, b) {
+    if (!a || !b) return false;
+    if (a === b) return true;
+
+    if (adminLevenshtein(a, b) <= 2) {
+      return true;
+    }
+
+    return ADMIN_NICKNAME_GROUPS.some(
+      group =>
+        group.includes(a) &&
+        group.includes(b)
+    );
+  }
+
+
+  function adminFindSimilarPeople(parsed, people) {
+    const targetFirst =
+      normalizeAdminName(parsed.first_name);
+
+    const targetLast =
+      normalizeAdminName(parsed.last_name);
+
+    return (people || [])
+      .filter(function (person) {
+        const parts = adminNameParts(person);
+
+        /*
+          Keep the warning conservative: the surname must
+          be exact or within one edit, and the first name
+          must be a close spelling or recognized familiar form.
+        */
+        const lastClose =
+          parts.last === targetLast ||
+          adminLevenshtein(parts.last, targetLast) <= 1;
+
+        return (
+          lastClose &&
+          adminFirstNamesRelated(
+            parts.first,
+            targetFirst
+          )
+        );
+      })
+      .sort(
+        (a, b) =>
+          adminDisplayName(a)
+            .localeCompare(
+              adminDisplayName(b)
+            )
+      );
+  }
+
+
   async function adminEnsurePeople(
     rawNames
   ) {
@@ -917,39 +1047,61 @@ document.addEventListener("DOMContentLoaded", async function () {
           );
         }
 
-        const {
-          data,
-          error
-        } = await window.ctlSupabase
-          .from("people")
-          .insert(parsed)
-          .select(
-            "id, first_name, last_name, email"
-          )
-          .single();
-
-        if (error) {
-          throw new Error(
-            `Could not add "${rawName}": ${error.message}`
+        const similar =
+          adminFindSimilarPeople(
+            parsed,
+            people
           );
+
+        if (similar.length) {
+          const candidate =
+            similar[0];
+
+          const useExisting =
+            window.confirm(
+              `You entered "${rawName}".\n\nA similar person already exists: "${adminDisplayName(candidate)}".\n\nClick OK to use the existing person.\nClick Cancel to create "${rawName}" as a new person.`
+            );
+
+          if (useExisting) {
+            person = candidate;
+          }
         }
 
-        person =
-          data;
+        if (!person) {
+          const {
+            data,
+            error
+          } = await window.ctlSupabase
+            .from("people")
+            .insert(parsed)
+            .select(
+              "id, first_name, last_name, email"
+            )
+            .single();
 
-        byName.set(
-          normalizeAdminName(
-            adminDisplayName(person)
-          ),
-          person
-        );
+          if (error) {
+            throw new Error(
+              `Could not add "${rawName}": ${error.message}`
+            );
+          }
 
-        byName.set(
-          normalizeAdminName(
-            `${person.last_name}, ${person.first_name}`
-          ),
-          person
-        );
+          person = data;
+          people.push(person);
+
+          byName.set(
+            normalizeAdminName(
+              adminDisplayName(person)
+            ),
+            person
+          );
+
+          byName.set(
+            normalizeAdminName(
+              `${person.last_name}, ${person.first_name}`
+            ),
+            person
+          );
+        }
       }
 
       resolved.set(
@@ -960,7 +1112,6 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     return resolved;
   }
-
 
   function getAdminEventFormValues(
     prefix
@@ -1320,6 +1471,8 @@ document.addEventListener("DOMContentLoaded", async function () {
     populateAdminEventSelects(
       adminEventRecords
     );
+
+    await populateMergePeopleSelects();
   }
 
 
@@ -1531,6 +1684,26 @@ document.addEventListener("DOMContentLoaded", async function () {
     const addAdminForm =
       document.getElementById(
         "addAdminForm"
+      );
+
+    const mergePersonA =
+      document.getElementById(
+        "mergePersonA"
+      );
+
+    const mergePersonB =
+      document.getElementById(
+        "mergePersonB"
+      );
+
+    const mergeKeepPerson =
+      document.getElementById(
+        "mergeKeepPerson"
+      );
+
+    const mergePeopleBtn =
+      document.getElementById(
+        "mergePeopleBtn"
       );
 
     addForm.addEventListener(
@@ -1919,6 +2092,26 @@ document.addEventListener("DOMContentLoaded", async function () {
         addAdministrator
       );
     }
+
+    if (mergePersonA && mergePersonB) {
+      mergePersonA.addEventListener("change", updateMergePeopleChoices);
+      mergePersonB.addEventListener("change", updateMergePeopleChoices);
+    }
+
+    if (mergeKeepPerson) {
+      mergeKeepPerson.addEventListener("change", function () {
+        if (mergePeopleBtn) {
+          mergePeopleBtn.disabled = !mergeKeepPerson.value;
+        }
+      });
+    }
+
+    if (mergePeopleBtn) {
+      mergePeopleBtn.addEventListener(
+        "click",
+        mergeSelectedPeople
+      );
+    }
   }
 
 
@@ -2109,6 +2302,202 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   }
 
+
+
+  async function populateMergePeopleSelects() {
+    const a = document.getElementById("mergePersonA");
+    const b = document.getElementById("mergePersonB");
+
+    if (!a || !b) {
+      return;
+    }
+
+    const people =
+      await adminFetchPeople();
+
+    const options =
+      people
+        .sort(
+          (x, y) =>
+            adminDisplayName(x)
+              .localeCompare(
+                adminDisplayName(y)
+              )
+        )
+        .map(
+          person =>
+            `<option value="${person.id}">${escapeAdminHtml(adminDisplayName(person))}</option>`
+        )
+        .join("");
+
+    const placeholder =
+      '<option value="">Select a person…</option>';
+
+    a.innerHTML =
+      placeholder + options;
+
+    b.innerHTML =
+      placeholder + options;
+
+    updateMergePeopleChoices();
+  }
+
+
+  function updateMergePeopleChoices() {
+    const a =
+      document.getElementById("mergePersonA");
+
+    const b =
+      document.getElementById("mergePersonB");
+
+    const keep =
+      document.getElementById("mergeKeepPerson");
+
+    const button =
+      document.getElementById("mergePeopleBtn");
+
+    if (!a || !b || !keep || !button) {
+      return;
+    }
+
+    const aId = Number(a.value);
+    const bId = Number(b.value);
+
+    if (
+      !aId ||
+      !bId ||
+      aId === bId
+    ) {
+      keep.innerHTML =
+        '<option value="">Select two different people first…</option>';
+      keep.disabled = true;
+      button.disabled = true;
+      return;
+    }
+
+    keep.innerHTML = `
+      <option value="">Choose the name to keep…</option>
+      <option value="${aId}">${escapeAdminHtml(a.options[a.selectedIndex].text)}</option>
+      <option value="${bId}">${escapeAdminHtml(b.options[b.selectedIndex].text)}</option>
+    `;
+
+    keep.disabled = false;
+    button.disabled = true;
+  }
+
+
+  async function mergeSelectedPeople() {
+    const aId =
+      Number(
+        document.getElementById("mergePersonA").value
+      );
+
+    const bId =
+      Number(
+        document.getElementById("mergePersonB").value
+      );
+
+    const keepId =
+      Number(
+        document.getElementById("mergeKeepPerson").value
+      );
+
+    if (
+      !aId ||
+      !bId ||
+      !keepId ||
+      aId === bId ||
+      ![aId, bId].includes(keepId)
+    ) {
+      setAdminMessage(
+        "Select two different people and choose the name to keep.",
+        true
+      );
+      return;
+    }
+
+    const removeId =
+      keepId === aId
+        ? bId
+        : aId;
+
+    const keepSelect =
+      document.getElementById("mergeKeepPerson");
+
+    const keepName =
+      keepSelect.options[
+        keepSelect.selectedIndex
+      ]?.text || "the selected person";
+
+    const removeSelect =
+      keepId === aId
+        ? document.getElementById("mergePersonB")
+        : document.getElementById("mergePersonA");
+
+    const removeName =
+      removeSelect.options[
+        removeSelect.selectedIndex
+      ]?.text || "the other person";
+
+    const confirmed =
+      window.confirm(
+        `Merge "${removeName}" into "${keepName}"?\n\nAll attendance, facilitation, and program-enrollment records will be moved to "${keepName}". The "${removeName}" person record will then be deleted.\n\nThis cannot be undone except from a backup.`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const button =
+      document.getElementById("mergePeopleBtn");
+
+    button.disabled = true;
+    setAdminMessage("Merging people…");
+
+    try {
+      const {
+        data,
+        error
+      } = await window.ctlSupabase
+        .rpc(
+          "merge_ctl_people",
+          {
+            keep_person_id: keepId,
+            remove_person_id: removeId
+          }
+        );
+
+      if (error) {
+        throw new Error(
+          "People could not be merged: " +
+          error.message
+        );
+      }
+
+      setAdminMessage(
+        `"${removeName}" was merged into "${keepName}".`
+      );
+
+      await refreshAdminReferenceData();
+
+      /*
+        Reload the public search data so the merged identity
+        is reflected immediately without requiring a page reload.
+      */
+      await loadData();
+      populateFilters();
+
+    } catch (error) {
+      console.error(error);
+      setAdminMessage(
+        error?.message ||
+        "People could not be merged.",
+        true
+      );
+    } finally {
+      button.disabled = false;
+    }
+  }
 
 
   async function adminCurrentEditorRecord() {
@@ -4546,13 +4935,23 @@ document.addEventListener("DOMContentLoaded", async function () {
       return;
     }
 
+    /*
+      Deduplicate people across participation and
+      program-membership sources by the name users
+      actually see. This prevents identical choice
+      buttons such as Shauna Turlip appearing twice.
+    */
     const key =
-      personKey(person);
+      normalize(
+        displayPersonName(
+          person
+        )
+      );
 
     if (
+      key &&
       !people.has(key)
     ) {
-
       people.set(
         key,
         person
@@ -5172,6 +5571,12 @@ document.addEventListener("DOMContentLoaded", async function () {
         )
       );
 
+
+      row.appendChild(
+        createCell(
+          event.type || ""
+        )
+      );
 
       row.appendChild(
         createCell(
