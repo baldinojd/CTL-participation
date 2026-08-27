@@ -103,14 +103,35 @@ document.addEventListener("DOMContentLoaded", async function () {
       return false;
     }
 
+    const email =
+      String(user.email || "")
+        .trim()
+        .toLowerCase();
+
+    let query =
+      window.ctlSupabase
+        .from("authorized_editors")
+        .select("id, auth_user_id, email, display_name, active, is_super_admin")
+        .eq("active", true);
+
+    if (email) {
+      query =
+        query.or(
+          `auth_user_id.eq.${user.id},email.ilike.${email}`
+        );
+    } else {
+      query =
+        query.eq(
+          "auth_user_id",
+          user.id
+        );
+    }
+
     const {
       data,
       error
-    } = await window.ctlSupabase
-      .from("authorized_editors")
-      .select("auth_user_id, display_name, active")
-      .eq("auth_user_id", user.id)
-      .eq("active", true)
+    } = await query
+      .limit(1)
       .maybeSingle();
 
     if (error) {
@@ -121,7 +142,39 @@ document.addEventListener("DOMContentLoaded", async function () {
       return false;
     }
 
-    return Boolean(data);
+    if (!data) {
+      return false;
+    }
+
+    if (
+      !data.auth_user_id &&
+      email &&
+      String(data.email || "")
+        .toLowerCase() === email
+    ) {
+      const {
+        error: linkError
+      } = await window.ctlSupabase
+        .from("authorized_editors")
+        .update({
+          auth_user_id:
+            user.id
+        })
+        .eq(
+          "id",
+          data.id
+        );
+
+      if (linkError) {
+        console.error(
+          "Admin account linking failed:",
+          linkError
+        );
+        return false;
+      }
+    }
+
+    return true;
   }
 
   async function refreshAdminState(user) {
@@ -209,6 +262,7 @@ document.addEventListener("DOMContentLoaded", async function () {
           <button type="button" class="ctl-admin-tab" data-admin-panel="editEventPanel">Edit Event</button>
           <button type="button" class="ctl-admin-tab" data-admin-panel="bulkEventsPanel">Bulk Semester Events</button>
           <button type="button" class="ctl-admin-tab" data-admin-panel="backupDataPanel">Backup Data</button>
+          <button type="button" class="ctl-admin-tab" data-admin-panel="manageAdminsPanel">Manage Administrators</button>
         </div>
 
         <div id="adminToolMessage" class="ctl-admin-message" aria-live="polite"></div>
@@ -304,6 +358,31 @@ document.addEventListener("DOMContentLoaded", async function () {
           <small>The files download to this computer and are not stored in GitHub.</small>
         </section>
 
+        <section id="manageAdminsPanel" class="ctl-admin-panel">
+          <h3>Manage Administrators</h3>
+          <p id="manageAdminsIntro">Pre-authorize a Lackawanna colleague by email. After that person signs in with Microsoft, the account will be linked automatically.</p>
+
+          <form id="addAdminForm">
+            <div class="ctl-admin-grid">
+              <div class="ctl-admin-field">
+                <label for="newAdminName">Name</label>
+                <input id="newAdminName" type="text" placeholder="First Last" required>
+              </div>
+
+              <div class="ctl-admin-field">
+                <label for="newAdminEmail">Lackawanna Email</label>
+                <input id="newAdminEmail" type="email" placeholder="name@lackawanna.edu" required>
+              </div>
+            </div>
+
+            <div class="ctl-admin-actions">
+              <button type="submit" class="primary">Add Administrator</button>
+            </div>
+          </form>
+
+          <div id="adminManagerList" class="ctl-admin-preview"></div>
+        </section>
+
         <datalist id="adminAyList"></datalist>
         <datalist id="adminSemesterList"></datalist>
         <datalist id="adminTypeList"></datalist>
@@ -315,6 +394,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     wireAdminForms();
 
     refreshAdminReferenceData()
+      .then(function () {
+        return refreshAdminManager();
+      })
       .catch(function (error) {
         console.error(error);
         setAdminMessage(
@@ -1434,6 +1516,11 @@ document.addEventListener("DOMContentLoaded", async function () {
         "backupDataBtn"
       );
 
+    const addAdminForm =
+      document.getElementById(
+        "addAdminForm"
+      );
+
     addForm.addEventListener(
       "submit",
       async function (event) {
@@ -1813,6 +1900,13 @@ document.addEventListener("DOMContentLoaded", async function () {
         downloadAdminBackup
       );
     }
+
+    if (addAdminForm) {
+      addAdminForm.addEventListener(
+        "submit",
+        addAdministrator
+      );
+    }
   }
 
 
@@ -2005,6 +2099,251 @@ document.addEventListener("DOMContentLoaded", async function () {
 
 
 
+  async function adminCurrentEditorRecord() {
+    if (!currentAdminUser?.id) {
+      return null;
+    }
+
+    const {
+      data,
+      error
+    } = await window.ctlSupabase
+      .from("authorized_editors")
+      .select("id, auth_user_id, email, display_name, active, is_super_admin")
+      .eq("auth_user_id", currentAdminUser.id)
+      .eq("active", true)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(
+        "Administrator status could not be checked: " +
+        error.message
+      );
+    }
+
+    return data || null;
+  }
+
+
+  async function refreshAdminManager() {
+    const panel =
+      document.getElementById(
+        "manageAdminsPanel"
+      );
+
+    const form =
+      document.getElementById(
+        "addAdminForm"
+      );
+
+    const list =
+      document.getElementById(
+        "adminManagerList"
+      );
+
+    if (!panel || !form || !list) {
+      return;
+    }
+
+    const me =
+      await adminCurrentEditorRecord();
+
+    const isSuper =
+      Boolean(
+        me?.is_super_admin
+      );
+
+    form.style.display =
+      isSuper ? "" : "none";
+
+    if (!isSuper) {
+      list.innerHTML =
+        "<p>Administrator management is restricted to the super administrator.</p>";
+      return;
+    }
+
+    const {
+      data,
+      error
+    } = await window.ctlSupabase
+      .from("authorized_editors")
+      .select("id, auth_user_id, email, display_name, active, is_super_admin")
+      .order("display_name", { ascending: true });
+
+    if (error) {
+      throw new Error(
+        "Administrator list could not be loaded: " +
+        error.message
+      );
+    }
+
+    const rows =
+      data || [];
+
+    list.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Microsoft Account</th>
+            <th>Status</th>
+            <th>Role</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(
+            row => `
+              <tr>
+                <td>${escapeAdminHtml(row.display_name || "")}</td>
+                <td>${escapeAdminHtml(row.email || "")}</td>
+                <td>${row.auth_user_id ? "Linked" : "Awaiting first sign-in"}</td>
+                <td>${row.active ? "Active" : "Inactive"}</td>
+                <td>${row.is_super_admin ? "Super Admin" : "Administrator"}</td>
+                <td>
+                  ${
+                    row.is_super_admin
+                      ? "Protected"
+                      : `<button type="button" class="secondary ctl-admin-status-btn" data-editor-id="${row.id}" data-next-active="${row.active ? "false" : "true"}">${row.active ? "Deactivate" : "Reactivate"}</button>`
+                  }
+                </td>
+              </tr>
+            `
+          ).join("")}
+        </tbody>
+      </table>
+    `;
+
+    list
+      .querySelectorAll(
+        ".ctl-admin-status-btn"
+      )
+      .forEach(function (button) {
+        button.addEventListener(
+          "click",
+          async function () {
+            await setAdministratorActive(
+              Number(button.dataset.editorId),
+              button.dataset.nextActive === "true"
+            );
+          }
+        );
+      });
+  }
+
+
+  async function addAdministrator(event) {
+    event.preventDefault();
+    setAdminMessage("");
+
+    const name =
+      document.getElementById(
+        "newAdminName"
+      ).value.trim();
+
+    const email =
+      document.getElementById(
+        "newAdminEmail"
+      ).value.trim().toLowerCase();
+
+    if (!name || !email) {
+      setAdminMessage(
+        "Enter the administrator's name and email address.",
+        true
+      );
+      return;
+    }
+
+    if (!email.endsWith("@lackawanna.edu")) {
+      setAdminMessage(
+        "Administrator access must use a Lackawanna email address.",
+        true
+      );
+      return;
+    }
+
+    try {
+      const {
+        error
+      } = await window.ctlSupabase
+        .from("authorized_editors")
+        .insert({
+          email,
+          display_name: name,
+          active: true,
+          is_super_admin: false
+        });
+
+      if (error) {
+        throw new Error(
+          "Administrator could not be added: " +
+          error.message
+        );
+      }
+
+      event.currentTarget.reset();
+
+      setAdminMessage(
+        `${name} has been pre-authorized. They can now visit this page and sign in with Microsoft.`
+      );
+
+      await refreshAdminManager();
+
+    } catch (error) {
+      console.error(error);
+      setAdminMessage(
+        error?.message ||
+        "Administrator could not be added.",
+        true
+      );
+    }
+  }
+
+
+  async function setAdministratorActive(
+    editorId,
+    active
+  ) {
+    try {
+      const {
+        error
+      } = await window.ctlSupabase
+        .from("authorized_editors")
+        .update({
+          active
+        })
+        .eq(
+          "id",
+          editorId
+        );
+
+      if (error) {
+        throw new Error(
+          "Administrator status could not be changed: " +
+          error.message
+        );
+      }
+
+      setAdminMessage(
+        active
+          ? "Administrator reactivated."
+          : "Administrator deactivated."
+      );
+
+      await refreshAdminManager();
+
+    } catch (error) {
+      console.error(error);
+      setAdminMessage(
+        error?.message ||
+        "Administrator status could not be changed.",
+        true
+      );
+    }
+  }
+
+
   function adminCsvValue(value) {
     if (value === null || value === undefined) {
       return "";
@@ -2130,7 +2469,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         ),
         adminBackupRows(
           "authorized_editors",
-          "id, auth_user_id, display_name, active"
+          "id, auth_user_id, email, display_name, active, is_super_admin"
         )
       ]);
 
@@ -2141,7 +2480,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         ["events", eventRows, ["id","event_date","semester","academic_year","event_type","topic","facilitator_id","created_at","updated_at"]],
         ["attendance", attendance, ["id","event_id","person_id","created_at"]],
         ["program_enrollments", enrollments, ["id","person_id","program_name","academic_year","created_at","updated_at"]],
-        ["authorized_editors", editors, ["id","auth_user_id","display_name","active"]]
+        ["authorized_editors", editors, ["id","auth_user_id","email","display_name","active","is_super_admin"]]
       ];
 
       files.forEach(
