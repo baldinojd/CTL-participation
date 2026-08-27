@@ -264,6 +264,7 @@ document.addEventListener("DOMContentLoaded", async function () {
           <button type="button" class="ctl-admin-tab" data-admin-panel="backupDataPanel">Backup Data</button>
           <button type="button" class="ctl-admin-tab" data-admin-panel="manageAdminsPanel">Manage Administrators</button>
           <button type="button" class="ctl-admin-tab" data-admin-panel="mergePeoplePanel">Merge People</button>
+          <button type="button" class="ctl-admin-tab" data-admin-panel="identityDiagnosticPanel">Identity Diagnostic</button>
         </div>
 
         <div id="adminToolMessage" class="ctl-admin-message" aria-live="polite"></div>
@@ -410,6 +411,22 @@ document.addEventListener("DOMContentLoaded", async function () {
             <button id="mergePeopleBtn" type="button" class="ctl-admin-danger" disabled>Merge People</button>
           </div>
           <small>This action permanently removes the redundant person record after moving its relationships to the retained person.</small>
+        </section>
+
+        <section id="identityDiagnosticPanel" class="ctl-admin-panel">
+          <h3>Identity Diagnostic</h3>
+          <p>Enter a name or part of a name to inspect exactly which live records are producing search matches.</p>
+
+          <div class="ctl-admin-field ctl-admin-wide">
+            <label for="identityDiagnosticQuery">Name</label>
+            <input id="identityDiagnosticQuery" type="text" placeholder="e.g., Turlip">
+          </div>
+
+          <div class="ctl-admin-actions">
+            <button id="runIdentityDiagnosticBtn" type="button" class="primary">Run Diagnostic</button>
+          </div>
+
+          <div id="identityDiagnosticResults" class="ctl-admin-preview"></div>
         </section>
 
         <datalist id="adminAyList"></datalist>
@@ -1706,6 +1723,11 @@ document.addEventListener("DOMContentLoaded", async function () {
         "mergePeopleBtn"
       );
 
+    const runIdentityDiagnosticBtn =
+      document.getElementById(
+        "runIdentityDiagnosticBtn"
+      );
+
     addForm.addEventListener(
       "submit",
       async function (event) {
@@ -2112,6 +2134,13 @@ document.addEventListener("DOMContentLoaded", async function () {
         mergeSelectedPeople
       );
     }
+
+    if (runIdentityDiagnosticBtn) {
+      runIdentityDiagnosticBtn.addEventListener(
+        "click",
+        runIdentityDiagnostic
+      );
+    }
   }
 
 
@@ -2302,6 +2331,163 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   }
 
+
+
+  async function runIdentityDiagnostic() {
+    const input =
+      document.getElementById(
+        "identityDiagnosticQuery"
+      );
+
+    const output =
+      document.getElementById(
+        "identityDiagnosticResults"
+      );
+
+    if (!input || !output) {
+      return;
+    }
+
+    const query =
+      input.value.trim();
+
+    if (!query) {
+      output.innerHTML =
+        "<p>Enter a name to inspect.</p>";
+      return;
+    }
+
+    output.innerHTML =
+      "<p>Checking live identity data…</p>";
+
+    try {
+      const normalizedQuery =
+        normalize(query);
+
+      const peopleRows =
+        await adminFetchPeople();
+
+      const directPeople =
+        peopleRows.filter(
+          person =>
+            normalize(
+              adminDisplayName(person)
+            ).includes(
+              normalizedQuery
+            ) ||
+            normalize(
+              `${person.last_name}, ${person.first_name}`
+            ).includes(
+              normalizedQuery
+            )
+        );
+
+      const searchCandidates =
+        getAllPeople().filter(
+          person =>
+            personMatchesQuery(
+              person,
+              query
+            )
+        );
+
+      const renderedCandidates =
+        searchCandidates.map(
+          (person, index) => ({
+            index: index + 1,
+            raw:
+              typeof person === "string"
+                ? person
+                : JSON.stringify(person),
+            display:
+              displayPersonName(person),
+            normalizedDisplay:
+              normalize(
+                displayPersonName(person)
+              ),
+            searchIdentityKey:
+              personSearchIdentityKey(person)
+          })
+        );
+
+      const eventMatches =
+        events
+          .filter(function (event) {
+            const names = [
+              ...(event.participants || []),
+              event.facilitator
+            ].filter(Boolean);
+
+            return names.some(
+              name =>
+                personMatchesQuery(
+                  name,
+                  query
+                )
+            );
+          })
+          .map(function (event) {
+            return {
+              id: event.id,
+              date: event.date,
+              topic: event.topic,
+              facilitator: event.facilitator,
+              matchingParticipants:
+                (event.participants || [])
+                  .filter(
+                    name =>
+                      personMatchesQuery(
+                        name,
+                        query
+                      )
+                  )
+            };
+          });
+
+      const programMatches =
+        programMemberships
+          .filter(
+            membership =>
+              personMatchesQuery(
+                membership.name,
+                query
+              )
+          );
+
+      const escapeJson =
+        value =>
+          escapeAdminHtml(
+            JSON.stringify(
+              value,
+              null,
+              2
+            )
+          );
+
+      output.innerHTML = `
+        <h4>people table (${directPeople.length})</h4>
+        <pre>${escapeJson(directPeople)}</pre>
+
+        <h4>Raw public-search candidates (${renderedCandidates.length})</h4>
+        <pre>${escapeJson(renderedCandidates)}</pre>
+
+        <h4>Matching event records (${eventMatches.length})</h4>
+        <pre>${escapeJson(eventMatches)}</pre>
+
+        <h4>Matching program memberships (${programMatches.length})</h4>
+        <pre>${escapeJson(programMatches)}</pre>
+      `;
+
+    } catch (error) {
+      console.error(error);
+
+      output.innerHTML =
+        `<p>${escapeAdminHtml(
+          error?.message ||
+          "Diagnostic failed."
+        )}</p>`;
+    }
+  }
 
 
   async function populateMergePeopleSelects() {
