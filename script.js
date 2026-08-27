@@ -1284,7 +1284,9 @@ document.addEventListener("DOMContentLoaded", async function () {
           };
         });
 
-    return records;
+    return sortEventsNewestFirst(
+      records
+    );
   }
 
 
@@ -1348,7 +1350,17 @@ document.addEventListener("DOMContentLoaded", async function () {
           )
           .filter(Boolean)
       )
-    ].sort();
+    ].sort(
+      (a, b) =>
+        String(b).localeCompare(
+          String(a),
+          undefined,
+          {
+            numeric: true,
+            sensitivity: "base"
+          }
+        )
+    );
 
     const semesters = [
       ...new Set(
@@ -4176,6 +4188,105 @@ document.addEventListener("DOMContentLoaded", async function () {
 
 
   /* =========================================================
+     CHRONOLOGICAL SORTING
+     Newest events first. Undated/Various events last.
+     ========================================================= */
+
+  function eventSortDateValue(event) {
+    const raw =
+      event?.event_date ||
+      event?.date ||
+      "";
+
+    if (
+      !raw ||
+      normalize(raw) === "various"
+    ) {
+      return null;
+    }
+
+    const isoMatch =
+      String(raw).match(
+        /^(\d{4})-(\d{2})-(\d{2})$/
+      );
+
+    if (isoMatch) {
+      return Date.UTC(
+        Number(isoMatch[1]),
+        Number(isoMatch[2]) - 1,
+        Number(isoMatch[3])
+      );
+    }
+
+    const parsed =
+      Date.parse(raw);
+
+    return Number.isNaN(parsed)
+      ? null
+      : parsed;
+  }
+
+
+  function compareEventsNewestFirst(a, b) {
+    const aDate =
+      eventSortDateValue(a);
+
+    const bDate =
+      eventSortDateValue(b);
+
+    if (aDate === null && bDate !== null) {
+      return 1;
+    }
+
+    if (aDate !== null && bDate === null) {
+      return -1;
+    }
+
+    if (
+      aDate !== null &&
+      bDate !== null &&
+      aDate !== bDate
+    ) {
+      return bDate - aDate;
+    }
+
+    const ayCompare =
+      String(
+        b?.academic_year ||
+        b?.academicYear ||
+        ""
+      ).localeCompare(
+        String(
+          a?.academic_year ||
+          a?.academicYear ||
+          ""
+        ),
+        undefined,
+        {
+          numeric: true,
+          sensitivity: "base"
+        }
+      );
+
+    if (ayCompare) {
+      return ayCompare;
+    }
+
+    return Number(b?.id || 0) -
+      Number(a?.id || 0);
+  }
+
+
+  function sortEventsNewestFirst(records) {
+    return [
+      ...(records || [])
+    ].sort(
+      compareEventsNewestFirst
+    );
+  }
+
+
+  /* =========================================================
      FILTER MENUS
      ========================================================= */
 
@@ -4231,7 +4342,17 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     Array
       .from(yearSet)
-      .sort()
+      .sort(
+        (a, b) =>
+          String(b).localeCompare(
+            String(a),
+            undefined,
+            {
+              numeric: true,
+              sensitivity: "base"
+            }
+          )
+      )
       .forEach(year => {
 
         const option =
@@ -5017,7 +5138,12 @@ document.addEventListener("DOMContentLoaded", async function () {
       "none";
 
 
-    results.forEach(event => {
+    const orderedResults =
+      sortEventsNewestFirst(
+        results
+      );
+
+    orderedResults.forEach(event => {
 
       const row =
         document.createElement(
@@ -5762,6 +5888,11 @@ document.addEventListener("DOMContentLoaded", async function () {
               "Supabase"
           };
         }
+      );
+
+    events =
+      sortEventsNewestFirst(
+        events
       );
 
 
