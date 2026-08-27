@@ -208,6 +208,7 @@ document.addEventListener("DOMContentLoaded", async function () {
           <button type="button" class="ctl-admin-tab" data-admin-panel="addAttendeesPanel">Add Attendees</button>
           <button type="button" class="ctl-admin-tab" data-admin-panel="editEventPanel">Edit Event</button>
           <button type="button" class="ctl-admin-tab" data-admin-panel="bulkEventsPanel">Bulk Semester Events</button>
+          <button type="button" class="ctl-admin-tab" data-admin-panel="backupDataPanel">Backup Data</button>
         </div>
 
         <div id="adminToolMessage" class="ctl-admin-message" aria-live="polite"></div>
@@ -292,6 +293,15 @@ document.addEventListener("DOMContentLoaded", async function () {
           </div>
 
           <div id="bulkPreview" class="ctl-admin-preview"></div>
+        </section>
+
+        <section id="backupDataPanel" class="ctl-admin-panel">
+          <h3>Backup Data</h3>
+          <p>Download a dated backup of the live CTL database as separate CSV files.</p>
+          <div class="ctl-admin-actions">
+            <button id="backupDataBtn" type="button" class="primary">Download Backup</button>
+          </div>
+          <small>The files download to this computer and are not stored in GitHub.</small>
         </section>
 
         <datalist id="adminAyList"></datalist>
@@ -1419,6 +1429,11 @@ document.addEventListener("DOMContentLoaded", async function () {
         "saveBulkEventsBtn"
       );
 
+    const backupDataBtn =
+      document.getElementById(
+        "backupDataBtn"
+      );
+
     addForm.addEventListener(
       "submit",
       async function (event) {
@@ -1791,6 +1806,13 @@ document.addEventListener("DOMContentLoaded", async function () {
         await saveBulkEvents();
       }
     );
+
+    if (backupDataBtn) {
+      backupDataBtn.addEventListener(
+        "click",
+        downloadAdminBackup
+      );
+    }
   }
 
 
@@ -1977,6 +1999,178 @@ document.addEventListener("DOMContentLoaded", async function () {
           "Updated attendance could not be saved: " +
           insertError.message
         );
+      }
+    }
+  }
+
+
+
+  function adminCsvValue(value) {
+    if (value === null || value === undefined) {
+      return "";
+    }
+
+    let output = String(value).replace(/"/g, '""');
+
+    if (/[",\r\n]/.test(output)) {
+      output = `"${output}"`;
+    }
+
+    return output;
+  }
+
+
+  function adminRowsToCsv(rows, columns) {
+    return [
+      columns.map(adminCsvValue).join(","),
+      ...(rows || []).map(
+        row =>
+          columns
+            .map(column => adminCsvValue(row[column]))
+            .join(",")
+      )
+    ].join("\r\n");
+  }
+
+
+  function adminDownloadCsv(filename, content) {
+    const blob = new Blob(
+      [content],
+      { type: "text/csv;charset=utf-8" }
+    );
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    setTimeout(
+      () => URL.revokeObjectURL(url),
+      1000
+    );
+  }
+
+
+  function adminBackupStamp() {
+    const now = new Date();
+
+    return [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0")
+    ].join("-");
+  }
+
+
+  async function adminBackupRows(table, columns) {
+    const {
+      data,
+      error
+    } = await window.ctlSupabase
+      .from(table)
+      .select(columns)
+      .order("id", { ascending: true });
+
+    if (error) {
+      throw new Error(
+        `${table} could not be backed up: ${error.message}`
+      );
+    }
+
+    return data || [];
+  }
+
+
+  async function downloadAdminBackup() {
+    if (!currentAdminAuthorized) {
+      setAdminMessage(
+        "You must be an authorized admin to download a backup.",
+        true
+      );
+      return;
+    }
+
+    const button =
+      document.getElementById("backupDataBtn");
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Preparing Backup…";
+    }
+
+    setAdminMessage("Preparing database backup…");
+
+    try {
+      const [
+        people,
+        eventRows,
+        attendance,
+        enrollments,
+        editors
+      ] = await Promise.all([
+        adminBackupRows(
+          "people",
+          "id, first_name, last_name, email, created_at, updated_at"
+        ),
+        adminBackupRows(
+          "events",
+          "id, event_date, semester, academic_year, event_type, topic, facilitator_id, created_at, updated_at"
+        ),
+        adminBackupRows(
+          "attendance",
+          "id, event_id, person_id, created_at"
+        ),
+        adminBackupRows(
+          "program_enrollments",
+          "id, person_id, program_name, academic_year, created_at, updated_at"
+        ),
+        adminBackupRows(
+          "authorized_editors",
+          "id, auth_user_id, display_name, active"
+        )
+      ]);
+
+      const stamp = adminBackupStamp();
+
+      const files = [
+        ["people", people, ["id","first_name","last_name","email","created_at","updated_at"]],
+        ["events", eventRows, ["id","event_date","semester","academic_year","event_type","topic","facilitator_id","created_at","updated_at"]],
+        ["attendance", attendance, ["id","event_id","person_id","created_at"]],
+        ["program_enrollments", enrollments, ["id","person_id","program_name","academic_year","created_at","updated_at"]],
+        ["authorized_editors", editors, ["id","auth_user_id","display_name","active"]]
+      ];
+
+      files.forEach(
+        ([name, rows, columns], index) => {
+          setTimeout(
+            () => adminDownloadCsv(
+              `CTL_Backup_${stamp}_${name}.csv`,
+              adminRowsToCsv(rows, columns)
+            ),
+            index * 300
+          );
+        }
+      );
+
+      setAdminMessage(
+        `Backup complete. ${files.length} CSV files are downloading. Keep them together as CTL_Backup_${stamp}.`
+      );
+
+    } catch (error) {
+      console.error(error);
+      setAdminMessage(
+        error?.message ||
+        "The database backup could not be created.",
+        true
+      );
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Download Backup";
       }
     }
   }
