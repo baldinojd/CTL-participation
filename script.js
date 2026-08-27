@@ -28,6 +28,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   let currentAdminUser = null;
   let currentAdminAuthorized = false;
+  let adminWorkspaceInitialized = false;
 
   /* =========================================================
      ADMIN AUTHENTICATION
@@ -87,6 +88,10 @@ document.addEventListener("DOMContentLoaded", async function () {
     if (adminWorkspace) {
       adminWorkspace.style.display =
         currentAdminAuthorized ? "" : "none";
+    }
+
+    if (currentAdminAuthorized) {
+      initializeAdminWorkspace();
     }
   }
 
@@ -166,6 +171,2137 @@ document.addEventListener("DOMContentLoaded", async function () {
       }
     );
   }
+
+
+  /* =========================================================
+     ADMIN DATA MANAGEMENT
+     Add events, add attendees, edit/delete events, and
+     bulk-create a semester schedule.
+     ========================================================= */
+
+  function initializeAdminWorkspace() {
+    if (
+      !adminWorkspace ||
+      adminWorkspaceInitialized
+    ) {
+      return;
+    }
+
+    adminWorkspaceInitialized = true;
+
+    const inner =
+      adminWorkspace.querySelector(
+        ".admin-workspace-inner"
+      ) || adminWorkspace;
+
+    inner.innerHTML = `
+      <div class="ctl-admin-shell">
+        <div class="ctl-admin-heading">
+          <div>
+            <h2>Admin Tools</h2>
+            <p>Add and maintain CTL participation records.</p>
+          </div>
+        </div>
+
+        <div class="ctl-admin-tabs" role="tablist" aria-label="Admin tools">
+          <button type="button" class="ctl-admin-tab is-active" data-admin-panel="addEventPanel">Add Event</button>
+          <button type="button" class="ctl-admin-tab" data-admin-panel="addAttendeesPanel">Add Attendees</button>
+          <button type="button" class="ctl-admin-tab" data-admin-panel="editEventPanel">Edit Event</button>
+          <button type="button" class="ctl-admin-tab" data-admin-panel="bulkEventsPanel">Bulk Semester Events</button>
+        </div>
+
+        <div id="adminToolMessage" class="ctl-admin-message" aria-live="polite"></div>
+
+        <section id="addEventPanel" class="ctl-admin-panel is-active">
+          <h3>Add New Event</h3>
+          <form id="addEventForm">
+            ${adminEventFieldsHtml("add")}
+            <div class="ctl-admin-actions">
+              <button type="submit" class="primary">Add Event</button>
+              <button type="reset" class="secondary">Clear</button>
+            </div>
+          </form>
+        </section>
+
+        <section id="addAttendeesPanel" class="ctl-admin-panel">
+          <h3>Add Attendees to Existing Event</h3>
+          <div class="ctl-admin-field ctl-admin-wide">
+            <label for="attendeeEventSearch">Find event</label>
+            <input id="attendeeEventSearch" type="search" placeholder="Filter by date, topic, semester, or AY">
+          </div>
+          <div class="ctl-admin-field ctl-admin-wide">
+            <label for="attendeeEventSelect">Event</label>
+            <select id="attendeeEventSelect"></select>
+          </div>
+          <form id="addAttendeesForm">
+            <div class="ctl-admin-field ctl-admin-wide">
+              <label for="newAttendees">Attendees to add</label>
+              <textarea id="newAttendees" rows="7" placeholder="One person per line. First Last or Last, First."></textarea>
+              <small>Existing attendees will be preserved. Duplicate names are ignored.</small>
+            </div>
+            <div class="ctl-admin-actions">
+              <button type="submit" class="primary">Add Attendees</button>
+            </div>
+          </form>
+        </section>
+
+        <section id="editEventPanel" class="ctl-admin-panel">
+          <h3>Edit Existing Event</h3>
+          <div class="ctl-admin-field ctl-admin-wide">
+            <label for="editEventSearch">Find event</label>
+            <input id="editEventSearch" type="search" placeholder="Filter by date, topic, semester, or AY">
+          </div>
+          <div class="ctl-admin-field ctl-admin-wide">
+            <label for="editEventSelect">Event</label>
+            <select id="editEventSelect"></select>
+          </div>
+
+          <form id="editEventForm" style="display:none;">
+            ${adminEventFieldsHtml("edit")}
+            <div class="ctl-admin-actions">
+              <button type="submit" class="primary">Save Changes</button>
+              <button id="deleteEventBtn" type="button" class="ctl-admin-danger">Delete Event</button>
+            </div>
+          </form>
+        </section>
+
+        <section id="bulkEventsPanel" class="ctl-admin-panel">
+          <h3>Bulk Add Semester Events</h3>
+
+          <div class="ctl-admin-grid ctl-admin-two">
+            <div class="ctl-admin-field">
+              <label for="bulkAcademicYear">Academic Year</label>
+              <input id="bulkAcademicYear" list="adminAyList" placeholder="2026-2027">
+            </div>
+
+            <div class="ctl-admin-field">
+              <label for="bulkSemester">Semester</label>
+              <input id="bulkSemester" list="adminSemesterList" placeholder="Fall">
+            </div>
+          </div>
+
+          <div class="ctl-admin-field ctl-admin-wide">
+            <label for="bulkEventsText">Paste semester events</label>
+            <textarea id="bulkEventsText" rows="10" placeholder="Paste from Excel using columns: Date | Event Type | Topic | Facilitator | Attendees"></textarea>
+            <small>Best method: paste tab-separated rows from Excel. Put multiple attendees in the Attendees cell separated by semicolons.</small>
+          </div>
+
+          <div class="ctl-admin-actions">
+            <button id="previewBulkEventsBtn" type="button" class="secondary">Preview</button>
+            <button id="saveBulkEventsBtn" type="button" class="primary" disabled>Add All Events</button>
+          </div>
+
+          <div id="bulkPreview" class="ctl-admin-preview"></div>
+        </section>
+
+        <datalist id="adminAyList"></datalist>
+        <datalist id="adminSemesterList"></datalist>
+        <datalist id="adminTypeList"></datalist>
+      </div>
+    `;
+
+    injectAdminStyles();
+    wireAdminTabs();
+    wireAdminForms();
+
+    refreshAdminReferenceData()
+      .catch(function (error) {
+        console.error(error);
+        setAdminMessage(
+          error?.message ||
+          "Admin reference data could not be loaded.",
+          true
+        );
+      });
+  }
+
+
+  function adminEventFieldsHtml(prefix) {
+    const p = prefix;
+
+    return `
+      <div class="ctl-admin-grid">
+        <div class="ctl-admin-field">
+          <label for="${p}EventDate">Date</label>
+          <input id="${p}EventDate" type="date">
+        </div>
+
+        <div class="ctl-admin-field">
+          <label for="${p}AcademicYear">Academic Year</label>
+          <input id="${p}AcademicYear" list="adminAyList" placeholder="2026-2027" required>
+        </div>
+
+        <div class="ctl-admin-field">
+          <label for="${p}Semester">Semester</label>
+          <input id="${p}Semester" list="adminSemesterList" placeholder="Fall" required>
+        </div>
+
+        <div class="ctl-admin-field">
+          <label for="${p}EventType">Event Type</label>
+          <input id="${p}EventType" list="adminTypeList" placeholder="Roundtable" required>
+        </div>
+
+        <div class="ctl-admin-field ctl-admin-span-2">
+          <label for="${p}Topic">Topic</label>
+          <input id="${p}Topic" type="text" required>
+        </div>
+
+        <div class="ctl-admin-field ctl-admin-span-2">
+          <label for="${p}Facilitator">Facilitator</label>
+          <input id="${p}Facilitator" type="text" placeholder="First Last or Last, First" required>
+        </div>
+
+        <div class="ctl-admin-field ctl-admin-wide">
+          <label for="${p}Participants">Attendees</label>
+          <textarea id="${p}Participants" rows="8" placeholder="One person per line. First Last or Last, First."></textarea>
+          <small>Paste the entire attendee list at once. The facilitator is stored separately and will not be duplicated as an attendee.</small>
+        </div>
+      </div>
+    `;
+  }
+
+
+  function injectAdminStyles() {
+    if (
+      document.getElementById(
+        "ctlAdminRuntimeStyles"
+      )
+    ) {
+      return;
+    }
+
+    const style =
+      document.createElement("style");
+
+    style.id =
+      "ctlAdminRuntimeStyles";
+
+    style.textContent = `
+      .admin-workspace {
+        max-width: 1400px;
+        margin: 24px auto 0;
+        padding: 0 28px;
+      }
+
+      .ctl-admin-shell {
+        background: #fff;
+        border: 1px solid #d9dde2;
+        border-radius: 8px;
+        padding: 22px;
+        box-shadow: 0 1px 3px rgba(0,0,0,.05);
+      }
+
+      .ctl-admin-heading h2 {
+        margin: 0 0 5px;
+        font-size: 1.35rem;
+      }
+
+      .ctl-admin-heading p {
+        margin: 0 0 18px;
+        color: #666;
+      }
+
+      .ctl-admin-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 18px;
+      }
+
+      .ctl-admin-tab {
+        height: auto;
+        min-height: 40px;
+        padding: 9px 14px;
+        background: #fff;
+        color: #263b52;
+        border: 1px solid #aeb7c1;
+      }
+
+      .ctl-admin-tab.is-active {
+        background: #263b52;
+        color: #fff;
+        border-color: #263b52;
+      }
+
+      .ctl-admin-panel {
+        display: none;
+        border-top: 1px solid #e2e5e8;
+        padding-top: 18px;
+      }
+
+      .ctl-admin-panel.is-active {
+        display: block;
+      }
+
+      .ctl-admin-panel h3 {
+        margin: 0 0 16px;
+      }
+
+      .ctl-admin-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 18px;
+      }
+
+      .ctl-admin-two {
+        margin-bottom: 14px;
+      }
+
+      .ctl-admin-field {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        margin-bottom: 14px;
+      }
+
+      .ctl-admin-field label {
+        margin-bottom: 6px;
+        font-size: .9rem;
+        font-weight: 700;
+      }
+
+      .ctl-admin-field input,
+      .ctl-admin-field select,
+      .ctl-admin-field textarea {
+        width: 100%;
+        border: 1px solid #b9c0c8;
+        border-radius: 5px;
+        padding: 10px 12px;
+        font: inherit;
+        background: #fff;
+        color: #222;
+      }
+
+      .ctl-admin-field input,
+      .ctl-admin-field select {
+        min-height: 44px;
+      }
+
+      .ctl-admin-field textarea {
+        resize: vertical;
+      }
+
+      .ctl-admin-field small {
+        margin-top: 5px;
+        color: #6b7279;
+        line-height: 1.35;
+      }
+
+      .ctl-admin-span-2,
+      .ctl-admin-wide {
+        grid-column: 1 / -1;
+      }
+
+      .ctl-admin-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 4px;
+      }
+
+      .ctl-admin-danger {
+        background: #fff;
+        color: #8b1e1e;
+        border: 1px solid #b97171;
+      }
+
+      .ctl-admin-danger:hover {
+        background: #fff4f4;
+      }
+
+      .ctl-admin-message {
+        display: none;
+        margin: 0 0 18px;
+        padding: 11px 13px;
+        border-radius: 5px;
+        background: #eef3f7;
+        border-left: 4px solid #263b52;
+      }
+
+      .ctl-admin-message.is-error {
+        background: #fff3f3;
+        border-left-color: #9d2b2b;
+      }
+
+      .ctl-admin-preview {
+        margin-top: 18px;
+        overflow-x: auto;
+      }
+
+      .ctl-admin-preview table {
+        min-width: 900px;
+      }
+
+      .ctl-admin-preview .preview-error {
+        color: #9d2b2b;
+        font-weight: 700;
+      }
+
+      @media (max-width: 700px) {
+        .admin-workspace {
+          padding: 0 16px;
+        }
+
+        .ctl-admin-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .ctl-admin-span-2,
+        .ctl-admin-wide {
+          grid-column: auto;
+        }
+
+        .ctl-admin-tab {
+          flex: 1 1 45%;
+        }
+      }
+    `;
+
+    document.head.appendChild(
+      style
+    );
+  }
+
+
+  function wireAdminTabs() {
+    const tabs =
+      adminWorkspace.querySelectorAll(
+        ".ctl-admin-tab"
+      );
+
+    const panels =
+      adminWorkspace.querySelectorAll(
+        ".ctl-admin-panel"
+      );
+
+    tabs.forEach(function (tab) {
+      tab.addEventListener(
+        "click",
+        function () {
+          tabs.forEach(
+            item =>
+              item.classList.remove(
+                "is-active"
+              )
+          );
+
+          panels.forEach(
+            panel =>
+              panel.classList.remove(
+                "is-active"
+              )
+          );
+
+          tab.classList.add(
+            "is-active"
+          );
+
+          const panel =
+            document.getElementById(
+              tab.dataset.adminPanel
+            );
+
+          if (panel) {
+            panel.classList.add(
+              "is-active"
+            );
+          }
+        }
+      );
+    });
+  }
+
+
+  function setAdminMessage(
+    message,
+    isError = false
+  ) {
+    const box =
+      document.getElementById(
+        "adminToolMessage"
+      );
+
+    if (!box) {
+      return;
+    }
+
+    box.textContent =
+      message || "";
+
+    box.classList.toggle(
+      "is-error",
+      Boolean(isError)
+    );
+
+    box.style.display =
+      message ? "block" : "none";
+  }
+
+
+  function normalizeAdminName(value) {
+    return String(value || "")
+      .toLowerCase()
+      .replace(/[.,;:()]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+
+  function adminDisplayName(person) {
+    const first =
+      String(
+        person?.first_name || ""
+      ).trim();
+
+    const last =
+      String(
+        person?.last_name || ""
+      ).trim();
+
+    return (
+      first + " " + last
+    ).trim();
+  }
+
+
+  function parseAdminPersonName(value) {
+    const raw =
+      String(value || "")
+        .trim();
+
+    if (!raw) {
+      return null;
+    }
+
+    if (raw.includes(",")) {
+      const parts =
+        raw.split(",");
+
+      const last =
+        parts.shift().trim();
+
+      const first =
+        parts.join(",").trim();
+
+      if (!last || !first) {
+        return null;
+      }
+
+      return {
+        first_name: first,
+        last_name: last
+      };
+    }
+
+    const parts =
+      raw
+        .split(/\s+/)
+        .filter(Boolean);
+
+    if (parts.length < 2) {
+      return null;
+    }
+
+    return {
+      first_name:
+        parts.slice(0, -1).join(" "),
+      last_name:
+        parts[parts.length - 1]
+    };
+  }
+
+
+  function parseAdminNameList(text) {
+    const values =
+      String(text || "")
+        .split(/\r?\n|;/)
+        .map(
+          value =>
+            value.trim()
+        )
+        .filter(Boolean);
+
+    const unique =
+      new Map();
+
+    values.forEach(function (value) {
+      unique.set(
+        normalizeAdminName(value),
+        value
+      );
+    });
+
+    return [
+      ...unique.values()
+    ];
+  }
+
+
+  async function adminFetchPeople() {
+    const {
+      data,
+      error
+    } = await window.ctlSupabase
+      .from("people")
+      .select(
+        "id, first_name, last_name, email"
+      )
+      .order(
+        "last_name",
+        {
+          ascending: true
+        }
+      );
+
+    if (error) {
+      throw new Error(
+        "People could not be loaded: " +
+        error.message
+      );
+    }
+
+    return data || [];
+  }
+
+
+  async function adminEnsurePeople(
+    rawNames
+  ) {
+    const names =
+      rawNames
+        .map(
+          value =>
+            String(value || "").trim()
+        )
+        .filter(Boolean);
+
+    const people =
+      await adminFetchPeople();
+
+    const byName =
+      new Map();
+
+    people.forEach(function (person) {
+      byName.set(
+        normalizeAdminName(
+          adminDisplayName(person)
+        ),
+        person
+      );
+
+      byName.set(
+        normalizeAdminName(
+          `${person.last_name}, ${person.first_name}`
+        ),
+        person
+      );
+    });
+
+    const resolved =
+      new Map();
+
+    for (const rawName of names) {
+      const key =
+        normalizeAdminName(
+          rawName
+        );
+
+      if (resolved.has(key)) {
+        continue;
+      }
+
+      let person =
+        byName.get(key);
+
+      if (!person) {
+        const parsed =
+          parseAdminPersonName(
+            rawName
+          );
+
+        if (!parsed) {
+          throw new Error(
+            `Could not interpret the name "${rawName}". Use First Last or Last, First.`
+          );
+        }
+
+        const {
+          data,
+          error
+        } = await window.ctlSupabase
+          .from("people")
+          .insert(parsed)
+          .select(
+            "id, first_name, last_name, email"
+          )
+          .single();
+
+        if (error) {
+          throw new Error(
+            `Could not add "${rawName}": ${error.message}`
+          );
+        }
+
+        person =
+          data;
+
+        byName.set(
+          normalizeAdminName(
+            adminDisplayName(person)
+          ),
+          person
+        );
+
+        byName.set(
+          normalizeAdminName(
+            `${person.last_name}, ${person.first_name}`
+          ),
+          person
+        );
+      }
+
+      resolved.set(
+        key,
+        person
+      );
+    }
+
+    return resolved;
+  }
+
+
+  function getAdminEventFormValues(
+    prefix
+  ) {
+    const date =
+      document.getElementById(
+        prefix + "EventDate"
+      ).value;
+
+    const academicYear =
+      document.getElementById(
+        prefix + "AcademicYear"
+      ).value.trim();
+
+    const semester =
+      document.getElementById(
+        prefix + "Semester"
+      ).value.trim();
+
+    const eventType =
+      document.getElementById(
+        prefix + "EventType"
+      ).value.trim();
+
+    const topic =
+      document.getElementById(
+        prefix + "Topic"
+      ).value.trim();
+
+    const facilitator =
+      document.getElementById(
+        prefix + "Facilitator"
+      ).value.trim();
+
+    const participants =
+      parseAdminNameList(
+        document.getElementById(
+          prefix + "Participants"
+        ).value
+      );
+
+    if (
+      !academicYear ||
+      !semester ||
+      !eventType ||
+      !topic ||
+      !facilitator
+    ) {
+      throw new Error(
+        "Academic year, semester, event type, topic, and facilitator are required."
+      );
+    }
+
+    return {
+      date,
+      academicYear,
+      semester,
+      eventType,
+      topic,
+      facilitator,
+      participants
+    };
+  }
+
+
+  async function adminResolveEventPeople(
+    facilitatorName,
+    participantNames
+  ) {
+    const allNames = [
+      facilitatorName,
+      ...participantNames
+    ];
+
+    const resolved =
+      await adminEnsurePeople(
+        allNames
+      );
+
+    const facilitator =
+      resolved.get(
+        normalizeAdminName(
+          facilitatorName
+        )
+      );
+
+    if (!facilitator) {
+      throw new Error(
+        "Facilitator could not be resolved."
+      );
+    }
+
+    const participantIds =
+      participantNames
+        .map(function (name) {
+          const person =
+            resolved.get(
+              normalizeAdminName(
+                name
+              )
+            );
+
+          return person?.id || null;
+        })
+        .filter(Boolean)
+        .filter(
+          id =>
+            id !== facilitator.id
+        );
+
+    return {
+      facilitator,
+      participantIds: [
+        ...new Set(
+          participantIds
+        )
+      ]
+    };
+  }
+
+
+  async function adminCreateEvent(
+    values
+  ) {
+    const {
+      facilitator,
+      participantIds
+    } = await adminResolveEventPeople(
+      values.facilitator,
+      values.participants
+    );
+
+    const {
+      data: event,
+      error: eventError
+    } = await window.ctlSupabase
+      .from("events")
+      .insert({
+        event_date:
+          values.date || null,
+        semester:
+          values.semester,
+        academic_year:
+          values.academicYear,
+        event_type:
+          values.eventType,
+        topic:
+          values.topic,
+        facilitator_id:
+          facilitator.id
+      })
+      .select(
+        "id"
+      )
+      .single();
+
+    if (eventError) {
+      throw new Error(
+        "Event could not be added: " +
+        eventError.message
+      );
+    }
+
+    if (participantIds.length) {
+      const rows =
+        participantIds.map(
+          personId => ({
+            event_id:
+              event.id,
+            person_id:
+              personId
+          })
+        );
+
+      const {
+        error: attendanceError
+      } = await window.ctlSupabase
+        .from("attendance")
+        .insert(rows);
+
+      if (attendanceError) {
+        await window.ctlSupabase
+          .from("events")
+          .delete()
+          .eq(
+            "id",
+            event.id
+          );
+
+        throw new Error(
+          "The event was rolled back because attendance could not be added: " +
+          attendanceError.message
+        );
+      }
+    }
+
+    return event.id;
+  }
+
+
+  async function adminFetchEventBundle() {
+    const [
+      peopleResult,
+      eventsResult,
+      attendanceResult
+    ] = await Promise.all([
+      window.ctlSupabase
+        .from("people")
+        .select(
+          "id, first_name, last_name, email"
+        ),
+
+      window.ctlSupabase
+        .from("events")
+        .select(
+          "id, event_date, semester, academic_year, event_type, topic, facilitator_id"
+        )
+        .order(
+          "event_date",
+          {
+            ascending: false,
+            nullsFirst: false
+          }
+        ),
+
+      window.ctlSupabase
+        .from("attendance")
+        .select(
+          "id, event_id, person_id"
+        )
+    ]);
+
+    if (peopleResult.error) {
+      throw new Error(
+        "People could not be loaded: " +
+        peopleResult.error.message
+      );
+    }
+
+    if (eventsResult.error) {
+      throw new Error(
+        "Events could not be loaded: " +
+        eventsResult.error.message
+      );
+    }
+
+    if (attendanceResult.error) {
+      throw new Error(
+        "Attendance could not be loaded: " +
+        attendanceResult.error.message
+      );
+    }
+
+    const peopleById =
+      new Map();
+
+    (peopleResult.data || [])
+      .forEach(function (person) {
+        peopleById.set(
+          person.id,
+          person
+        );
+      });
+
+    const attendanceByEvent =
+      new Map();
+
+    (attendanceResult.data || [])
+      .forEach(function (row) {
+        if (
+          !attendanceByEvent.has(
+            row.event_id
+          )
+        ) {
+          attendanceByEvent.set(
+            row.event_id,
+            []
+          );
+        }
+
+        attendanceByEvent
+          .get(row.event_id)
+          .push(row);
+      });
+
+    const records =
+      (eventsResult.data || [])
+        .map(function (event) {
+          const facilitator =
+            peopleById.get(
+              event.facilitator_id
+            );
+
+          const attendanceRows =
+            attendanceByEvent.get(
+              event.id
+            ) || [];
+
+          const participants =
+            attendanceRows
+              .map(
+                row =>
+                  peopleById.get(
+                    row.person_id
+                  )
+              )
+              .filter(Boolean)
+              .sort(
+                (a, b) =>
+                  adminDisplayName(a)
+                    .localeCompare(
+                      adminDisplayName(b)
+                    )
+              );
+
+          return {
+            ...event,
+            facilitator,
+            participants,
+            attendanceRows
+          };
+        });
+
+    return records;
+  }
+
+
+  function adminEventLabel(record) {
+    const date =
+      record.event_date ||
+      "Various";
+
+    return [
+      date,
+      record.semester,
+      record.academic_year,
+      record.topic
+    ]
+      .filter(Boolean)
+      .join(" — ");
+  }
+
+
+  let adminEventRecords = [];
+
+
+  async function refreshAdminReferenceData() {
+    adminEventRecords =
+      await adminFetchEventBundle();
+
+    populateAdminDatalists(
+      adminEventRecords
+    );
+
+    populateAdminEventSelects(
+      adminEventRecords
+    );
+  }
+
+
+  function populateAdminDatalists(
+    records
+  ) {
+    const ayList =
+      document.getElementById(
+        "adminAyList"
+      );
+
+    const semesterList =
+      document.getElementById(
+        "adminSemesterList"
+      );
+
+    const typeList =
+      document.getElementById(
+        "adminTypeList"
+      );
+
+    const years = [
+      ...new Set(
+        records
+          .map(
+            record =>
+              record.academic_year
+          )
+          .filter(Boolean)
+      )
+    ].sort();
+
+    const semesters = [
+      ...new Set(
+        records
+          .map(
+            record =>
+              record.semester
+          )
+          .filter(Boolean)
+      )
+    ];
+
+    const types = [
+      ...new Set(
+        records
+          .map(
+            record =>
+              record.event_type
+          )
+          .filter(Boolean)
+      )
+    ].sort();
+
+    ayList.innerHTML =
+      years
+        .map(
+          value =>
+            `<option value="${escapeAdminHtml(value)}"></option>`
+        )
+        .join("");
+
+    semesterList.innerHTML =
+      semesters
+        .map(
+          value =>
+            `<option value="${escapeAdminHtml(value)}"></option>`
+        )
+        .join("");
+
+    typeList.innerHTML =
+      types
+        .map(
+          value =>
+            `<option value="${escapeAdminHtml(value)}"></option>`
+        )
+        .join("");
+  }
+
+
+  function escapeAdminHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+
+  function populateAdminEventSelects(
+    records,
+    filterText = ""
+  ) {
+    const normalized =
+      normalizeAdminName(
+        filterText
+      );
+
+    const filtered =
+      records.filter(
+        record => {
+          if (!normalized) {
+            return true;
+          }
+
+          return normalizeAdminName(
+            adminEventLabel(
+              record
+            )
+          ).includes(
+            normalized
+          );
+        }
+      );
+
+    [
+      "attendeeEventSelect",
+      "editEventSelect"
+    ].forEach(function (id) {
+      const select =
+        document.getElementById(id);
+
+      if (!select) {
+        return;
+      }
+
+      const current =
+        select.value;
+
+      select.innerHTML =
+        '<option value="">Select an event…</option>' +
+        filtered
+          .map(
+            record =>
+              `<option value="${record.id}">${escapeAdminHtml(adminEventLabel(record))}</option>`
+          )
+          .join("");
+
+      if (
+        filtered.some(
+          record =>
+            String(record.id) ===
+            String(current)
+        )
+      ) {
+        select.value =
+          current;
+      }
+    });
+  }
+
+
+  function wireAdminForms() {
+    const addForm =
+      document.getElementById(
+        "addEventForm"
+      );
+
+    const addAttendeesForm =
+      document.getElementById(
+        "addAttendeesForm"
+      );
+
+    const editForm =
+      document.getElementById(
+        "editEventForm"
+      );
+
+    const editSelect =
+      document.getElementById(
+        "editEventSelect"
+      );
+
+    const attendeeSearch =
+      document.getElementById(
+        "attendeeEventSearch"
+      );
+
+    const editSearch =
+      document.getElementById(
+        "editEventSearch"
+      );
+
+    const previewBtn =
+      document.getElementById(
+        "previewBulkEventsBtn"
+      );
+
+    const saveBulkBtn =
+      document.getElementById(
+        "saveBulkEventsBtn"
+      );
+
+    addForm.addEventListener(
+      "submit",
+      async function (event) {
+        event.preventDefault();
+        setAdminMessage("");
+
+        const submit =
+          addForm.querySelector(
+            'button[type="submit"]'
+          );
+
+        submit.disabled = true;
+
+        try {
+          const values =
+            getAdminEventFormValues(
+              "add"
+            );
+
+          await adminCreateEvent(
+            values
+          );
+
+          setAdminMessage(
+            "Event added successfully."
+          );
+
+          addForm.reset();
+
+          await refreshAdminReferenceData();
+
+        } catch (error) {
+          console.error(error);
+          setAdminMessage(
+            error?.message ||
+            "The event could not be added.",
+            true
+          );
+        } finally {
+          submit.disabled = false;
+        }
+      }
+    );
+
+
+    addAttendeesForm.addEventListener(
+      "submit",
+      async function (event) {
+        event.preventDefault();
+        setAdminMessage("");
+
+        const eventId =
+          Number(
+            document.getElementById(
+              "attendeeEventSelect"
+            ).value
+          );
+
+        const names =
+          parseAdminNameList(
+            document.getElementById(
+              "newAttendees"
+            ).value
+          );
+
+        if (!eventId) {
+          setAdminMessage(
+            "Select an event first.",
+            true
+          );
+          return;
+        }
+
+        if (!names.length) {
+          setAdminMessage(
+            "Enter at least one attendee.",
+            true
+          );
+          return;
+        }
+
+        try {
+          const record =
+            adminEventRecords.find(
+              item =>
+                item.id === eventId
+            );
+
+          if (!record) {
+            throw new Error(
+              "The selected event could not be found."
+            );
+          }
+
+          const resolved =
+            await adminEnsurePeople(
+              names
+            );
+
+          const existingIds =
+            new Set(
+              record.attendanceRows.map(
+                row =>
+                  row.person_id
+              )
+            );
+
+          const facilitatorId =
+            record.facilitator_id;
+
+          const rows = [];
+
+          names.forEach(
+            name => {
+              const person =
+                resolved.get(
+                  normalizeAdminName(
+                    name
+                  )
+                );
+
+              if (
+                person &&
+                person.id !== facilitatorId &&
+                !existingIds.has(
+                  person.id
+                )
+              ) {
+                rows.push({
+                  event_id:
+                    eventId,
+                  person_id:
+                    person.id
+                });
+
+                existingIds.add(
+                  person.id
+                );
+              }
+            }
+          );
+
+          if (!rows.length) {
+            setAdminMessage(
+              "No new attendees were added; everyone listed was already attached to the event."
+            );
+            return;
+          }
+
+          const {
+            error
+          } = await window.ctlSupabase
+            .from("attendance")
+            .insert(rows);
+
+          if (error) {
+            throw new Error(
+              "Attendance could not be added: " +
+              error.message
+            );
+          }
+
+          document.getElementById(
+            "newAttendees"
+          ).value = "";
+
+          setAdminMessage(
+            `${rows.length} attendee${rows.length === 1 ? "" : "s"} added successfully.`
+          );
+
+          await refreshAdminReferenceData();
+
+        } catch (error) {
+          console.error(error);
+          setAdminMessage(
+            error?.message ||
+            "Attendance could not be added.",
+            true
+          );
+        }
+      }
+    );
+
+
+    editSelect.addEventListener(
+      "change",
+      function () {
+        loadAdminEditForm(
+          Number(
+            editSelect.value
+          )
+        );
+      }
+    );
+
+
+    editForm.addEventListener(
+      "submit",
+      async function (event) {
+        event.preventDefault();
+        setAdminMessage("");
+
+        const eventId =
+          Number(
+            editSelect.value
+          );
+
+        if (!eventId) {
+          setAdminMessage(
+            "Select an event first.",
+            true
+          );
+          return;
+        }
+
+        try {
+          const values =
+            getAdminEventFormValues(
+              "edit"
+            );
+
+          await adminUpdateEvent(
+            eventId,
+            values
+          );
+
+          setAdminMessage(
+            "Event updated successfully."
+          );
+
+          await refreshAdminReferenceData();
+
+          loadAdminEditForm(
+            eventId
+          );
+
+        } catch (error) {
+          console.error(error);
+          setAdminMessage(
+            error?.message ||
+            "The event could not be updated.",
+            true
+          );
+        }
+      }
+    );
+
+
+    document.getElementById(
+      "deleteEventBtn"
+    ).addEventListener(
+      "click",
+      async function () {
+        const eventId =
+          Number(
+            editSelect.value
+          );
+
+        const record =
+          adminEventRecords.find(
+            item =>
+              item.id === eventId
+          );
+
+        if (!record) {
+          return;
+        }
+
+        const confirmed =
+          window.confirm(
+            `Delete "${record.topic}"? This will also remove its attendance records.`
+          );
+
+        if (!confirmed) {
+          return;
+        }
+
+        try {
+          const {
+            error: attendanceError
+          } = await window.ctlSupabase
+            .from("attendance")
+            .delete()
+            .eq(
+              "event_id",
+              eventId
+            );
+
+          if (attendanceError) {
+            throw new Error(
+              "Attendance could not be removed: " +
+              attendanceError.message
+            );
+          }
+
+          const {
+            error: eventError
+          } = await window.ctlSupabase
+            .from("events")
+            .delete()
+            .eq(
+              "id",
+              eventId
+            );
+
+          if (eventError) {
+            throw new Error(
+              "Event could not be deleted: " +
+              eventError.message
+            );
+          }
+
+          editForm.style.display =
+            "none";
+
+          setAdminMessage(
+            "Event deleted."
+          );
+
+          await refreshAdminReferenceData();
+
+        } catch (error) {
+          console.error(error);
+          setAdminMessage(
+            error?.message ||
+            "The event could not be deleted.",
+            true
+          );
+        }
+      }
+    );
+
+
+    attendeeSearch.addEventListener(
+      "input",
+      function () {
+        populateOneAdminEventSelect(
+          "attendeeEventSelect",
+          attendeeSearch.value
+        );
+      }
+    );
+
+
+    editSearch.addEventListener(
+      "input",
+      function () {
+        populateOneAdminEventSelect(
+          "editEventSelect",
+          editSearch.value
+        );
+
+        editForm.style.display =
+          "none";
+      }
+    );
+
+
+    previewBtn.addEventListener(
+      "click",
+      function () {
+        previewBulkEvents();
+      }
+    );
+
+
+    saveBulkBtn.addEventListener(
+      "click",
+      async function () {
+        await saveBulkEvents();
+      }
+    );
+  }
+
+
+  function populateOneAdminEventSelect(
+    selectId,
+    filterText
+  ) {
+    const select =
+      document.getElementById(
+        selectId
+      );
+
+    const normalized =
+      normalizeAdminName(
+        filterText
+      );
+
+    const filtered =
+      adminEventRecords.filter(
+        record =>
+          !normalized ||
+          normalizeAdminName(
+            adminEventLabel(record)
+          ).includes(
+            normalized
+          )
+      );
+
+    select.innerHTML =
+      '<option value="">Select an event…</option>' +
+      filtered
+        .map(
+          record =>
+            `<option value="${record.id}">${escapeAdminHtml(adminEventLabel(record))}</option>`
+        )
+        .join("");
+  }
+
+
+  function loadAdminEditForm(
+    eventId
+  ) {
+    const form =
+      document.getElementById(
+        "editEventForm"
+      );
+
+    const record =
+      adminEventRecords.find(
+        item =>
+          item.id === eventId
+      );
+
+    if (!record) {
+      form.style.display =
+        "none";
+      return;
+    }
+
+    document.getElementById(
+      "editEventDate"
+    ).value =
+      record.event_date || "";
+
+    document.getElementById(
+      "editAcademicYear"
+    ).value =
+      record.academic_year || "";
+
+    document.getElementById(
+      "editSemester"
+    ).value =
+      record.semester || "";
+
+    document.getElementById(
+      "editEventType"
+    ).value =
+      record.event_type || "";
+
+    document.getElementById(
+      "editTopic"
+    ).value =
+      record.topic || "";
+
+    document.getElementById(
+      "editFacilitator"
+    ).value =
+      adminDisplayName(
+        record.facilitator
+      );
+
+    document.getElementById(
+      "editParticipants"
+    ).value =
+      record.participants
+        .map(
+          adminDisplayName
+        )
+        .join("\n");
+
+    form.style.display =
+      "block";
+  }
+
+
+  async function adminUpdateEvent(
+    eventId,
+    values
+  ) {
+    const {
+      facilitator,
+      participantIds
+    } = await adminResolveEventPeople(
+      values.facilitator,
+      values.participants
+    );
+
+    const {
+      error: eventError
+    } = await window.ctlSupabase
+      .from("events")
+      .update({
+        event_date:
+          values.date || null,
+        semester:
+          values.semester,
+        academic_year:
+          values.academicYear,
+        event_type:
+          values.eventType,
+        topic:
+          values.topic,
+        facilitator_id:
+          facilitator.id
+      })
+      .eq(
+        "id",
+        eventId
+      );
+
+    if (eventError) {
+      throw new Error(
+        "Event details could not be updated: " +
+        eventError.message
+      );
+    }
+
+    const {
+      error: deleteError
+    } = await window.ctlSupabase
+      .from("attendance")
+      .delete()
+      .eq(
+        "event_id",
+        eventId
+      );
+
+    if (deleteError) {
+      throw new Error(
+        "Old attendance could not be replaced: " +
+        deleteError.message
+      );
+    }
+
+    if (participantIds.length) {
+      const rows =
+        participantIds.map(
+          personId => ({
+            event_id:
+              eventId,
+            person_id:
+              personId
+          })
+        );
+
+      const {
+        error: insertError
+      } = await window.ctlSupabase
+        .from("attendance")
+        .insert(rows);
+
+      if (insertError) {
+        throw new Error(
+          "Updated attendance could not be saved: " +
+          insertError.message
+        );
+      }
+    }
+  }
+
+
+  let bulkPreviewRecords = [];
+
+
+  function parseBulkEventRows(
+    text
+  ) {
+    const raw =
+      String(text || "")
+        .trim();
+
+    if (!raw) {
+      return [];
+    }
+
+    let rows;
+
+    if (raw.includes("\t")) {
+      rows =
+        raw
+          .split(/\r?\n/)
+          .filter(
+            line =>
+              line.trim()
+          )
+          .map(
+            line =>
+              line.split("\t")
+          );
+    } else {
+      rows =
+        parseCSV(raw);
+    }
+
+    if (!rows.length) {
+      return [];
+    }
+
+    const first =
+      rows[0].map(
+        cell =>
+          normalizeAdminName(
+            cell
+          )
+      );
+
+    const hasHeader =
+      first.includes("date") &&
+      (
+        first.includes("topic") ||
+        first.includes("event type")
+      );
+
+    if (hasHeader) {
+      rows =
+        rows.slice(1);
+    }
+
+    return rows.map(
+      (row, index) => {
+        const date =
+          String(
+            row[0] || ""
+          ).trim();
+
+        const eventType =
+          String(
+            row[1] || ""
+          ).trim();
+
+        const topic =
+          String(
+            row[2] || ""
+          ).trim();
+
+        const facilitator =
+          String(
+            row[3] || ""
+          ).trim();
+
+        const attendees =
+          String(
+            row[4] || ""
+          ).trim();
+
+        const errors = [];
+
+        if (!eventType) {
+          errors.push(
+            "missing event type"
+          );
+        }
+
+        if (!topic) {
+          errors.push(
+            "missing topic"
+          );
+        }
+
+        if (!facilitator) {
+          errors.push(
+            "missing facilitator"
+          );
+        }
+
+        return {
+          rowNumber:
+            index + 1,
+          date,
+          eventType,
+          topic,
+          facilitator,
+          participants:
+            parseAdminNameList(
+              attendees
+            ),
+          errors
+        };
+      }
+    );
+  }
+
+
+  function previewBulkEvents() {
+    const academicYear =
+      document.getElementById(
+        "bulkAcademicYear"
+      ).value.trim();
+
+    const semester =
+      document.getElementById(
+        "bulkSemester"
+      ).value.trim();
+
+    const preview =
+      document.getElementById(
+        "bulkPreview"
+      );
+
+    const saveBtn =
+      document.getElementById(
+        "saveBulkEventsBtn"
+      );
+
+    if (
+      !academicYear ||
+      !semester
+    ) {
+      setAdminMessage(
+        "Enter an academic year and semester before previewing.",
+        true
+      );
+      saveBtn.disabled = true;
+      return;
+    }
+
+    bulkPreviewRecords =
+      parseBulkEventRows(
+        document.getElementById(
+          "bulkEventsText"
+        ).value
+      );
+
+    if (!bulkPreviewRecords.length) {
+      setAdminMessage(
+        "Paste at least one event row.",
+        true
+      );
+      preview.innerHTML = "";
+      saveBtn.disabled = true;
+      return;
+    }
+
+    const hasErrors =
+      bulkPreviewRecords.some(
+        row =>
+          row.errors.length
+      );
+
+    preview.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Row</th>
+            <th>Date</th>
+            <th>AY</th>
+            <th>Semester</th>
+            <th>Event Type</th>
+            <th>Topic</th>
+            <th>Facilitator</th>
+            <th>Attendees</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${bulkPreviewRecords.map(
+            row => `
+              <tr>
+                <td>${row.rowNumber}</td>
+                <td>${escapeAdminHtml(row.date)}</td>
+                <td>${escapeAdminHtml(academicYear)}</td>
+                <td>${escapeAdminHtml(semester)}</td>
+                <td>${escapeAdminHtml(row.eventType)}</td>
+                <td>${escapeAdminHtml(row.topic)}</td>
+                <td>${escapeAdminHtml(row.facilitator)}</td>
+                <td>${row.participants.length}</td>
+                <td class="${row.errors.length ? "preview-error" : ""}">
+                  ${row.errors.length ? escapeAdminHtml(row.errors.join(", ")) : "Ready"}
+                </td>
+              </tr>
+            `
+          ).join("")}
+        </tbody>
+      </table>
+    `;
+
+    saveBtn.disabled =
+      hasErrors;
+
+    setAdminMessage(
+      hasErrors
+        ? "Fix the flagged rows before adding events."
+        : `${bulkPreviewRecords.length} event${bulkPreviewRecords.length === 1 ? "" : "s"} ready to add.`,
+      hasErrors
+    );
+  }
+
+
+  async function saveBulkEvents() {
+    const academicYear =
+      document.getElementById(
+        "bulkAcademicYear"
+      ).value.trim();
+
+    const semester =
+      document.getElementById(
+        "bulkSemester"
+      ).value.trim();
+
+    const saveBtn =
+      document.getElementById(
+        "saveBulkEventsBtn"
+      );
+
+    if (
+      !bulkPreviewRecords.length
+    ) {
+      setAdminMessage(
+        "Preview the bulk events first.",
+        true
+      );
+      return;
+    }
+
+    if (
+      bulkPreviewRecords.some(
+        row =>
+          row.errors.length
+      )
+    ) {
+      setAdminMessage(
+        "Fix the flagged rows before saving.",
+        true
+      );
+      return;
+    }
+
+    saveBtn.disabled = true;
+
+    let created = 0;
+
+    try {
+      for (
+        const row of bulkPreviewRecords
+      ) {
+        await adminCreateEvent({
+          date:
+            row.date,
+          academicYear,
+          semester,
+          eventType:
+            row.eventType,
+          topic:
+            row.topic,
+          facilitator:
+            row.facilitator,
+          participants:
+            row.participants
+        });
+
+        created++;
+      }
+
+      setAdminMessage(
+        `${created} event${created === 1 ? "" : "s"} added successfully.`
+      );
+
+      document.getElementById(
+        "bulkEventsText"
+      ).value = "";
+
+      document.getElementById(
+        "bulkPreview"
+      ).innerHTML = "";
+
+      bulkPreviewRecords = [];
+
+      await refreshAdminReferenceData();
+
+    } catch (error) {
+      console.error(error);
+
+      setAdminMessage(
+        `${created} event${created === 1 ? "" : "s"} were added before an error occurred. ${error?.message || ""}`.trim(),
+        true
+      );
+    } finally {
+      saveBtn.disabled = false;
+    }
+  }
+
 
   if (adminSignInBtn) {
     adminSignInBtn.addEventListener(
