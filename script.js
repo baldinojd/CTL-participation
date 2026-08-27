@@ -3356,6 +3356,23 @@ document.addEventListener("DOMContentLoaded", async function () {
 
 
   /*
+    Search-only identity key. Historical data uses both
+    "First Last" and "Last, First". Sorting the normalized
+    name words makes those representations the same person
+    for candidate-list purposes without changing stored data.
+  */
+  function personSearchIdentityKey(person) {
+    return normalize(
+      displayPersonName(person)
+    )
+      .split(" ")
+      .filter(Boolean)
+      .sort()
+      .join("|");
+  }
+
+
+  /*
     Canonical CSV format:
       Last, First
 
@@ -4945,10 +4962,8 @@ document.addEventListener("DOMContentLoaded", async function () {
       buttons such as Shauna Turlip appearing twice.
     */
     const key =
-      normalize(
-        displayPersonName(
-          person
-        )
+      personSearchIdentityKey(
+        person
       );
 
     if (
@@ -5096,10 +5111,8 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     matches.forEach(function (person) {
       const key =
-        normalize(
-          displayPersonName(
-            person
-          )
+        personSearchIdentityKey(
+          person
         );
 
       if (
