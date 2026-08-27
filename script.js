@@ -3340,6 +3340,9 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   function normalize(value) {
     return String(value || "")
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
       .toLowerCase()
       .replace(/[.,;:()]/g, " ")
       .replace(/\s+/g, " ")
@@ -5079,13 +5082,40 @@ document.addEventListener("DOMContentLoaded", async function () {
     query
   ) {
 
-    return getAllPeople().filter(
-      person =>
-        personMatchesQuery(
-          person,
-          query
-        )
-    );
+    const matches =
+      getAllPeople().filter(
+        person =>
+          personMatchesQuery(
+            person,
+            query
+          )
+      );
+
+    const unique =
+      new Map();
+
+    matches.forEach(function (person) {
+      const key =
+        normalize(
+          displayPersonName(
+            person
+          )
+        );
+
+      if (
+        key &&
+        !unique.has(key)
+      ) {
+        unique.set(
+          key,
+          person
+        );
+      }
+    });
+
+    return [
+      ...unique.values()
+    ];
   }
 
 
@@ -5255,6 +5285,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         <th>Date</th>
         <th>Semester</th>
         <th>AY</th>
+        <th>Event Type</th>
         <th>Topic</th>
         <th>Facilitator</th>
       </tr>
@@ -5269,6 +5300,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         <th>Date</th>
         <th>Semester</th>
         <th>AY</th>
+        <th>Event Type</th>
         <th>Topic</th>
         <th>Facilitator</th>
         <th>Participants</th>
