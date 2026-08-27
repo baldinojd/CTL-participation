@@ -424,6 +424,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
           <div class="ctl-admin-actions">
             <button id="runIdentityDiagnosticBtn" type="button" class="primary">Run Diagnostic</button>
+            <button id="scanAllDuplicatesBtn" type="button" class="secondary">Scan All People</button>
           </div>
 
           <div id="identityDiagnosticResults" class="ctl-admin-preview"></div>
@@ -1728,6 +1729,11 @@ document.addEventListener("DOMContentLoaded", async function () {
         "runIdentityDiagnosticBtn"
       );
 
+    const scanAllDuplicatesBtn =
+      document.getElementById(
+        "scanAllDuplicatesBtn"
+      );
+
     addForm.addEventListener(
       "submit",
       async function (event) {
@@ -2141,6 +2147,13 @@ document.addEventListener("DOMContentLoaded", async function () {
         runIdentityDiagnostic
       );
     }
+
+    if (scanAllDuplicatesBtn) {
+      scanAllDuplicatesBtn.addEventListener(
+        "click",
+        scanAllPotentialDuplicatePeople
+      );
+    }
   }
 
 
@@ -2331,6 +2344,277 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   }
 
+
+
+  function adminDuplicateScore(a, b) {
+    const aFirst =
+      normalizeAdminName(
+        a?.first_name || ""
+      );
+
+    const bFirst =
+      normalizeAdminName(
+        b?.first_name || ""
+      );
+
+    const aLast =
+      normalizeAdminName(
+        a?.last_name || ""
+      );
+
+    const bLast =
+      normalizeAdminName(
+        b?.last_name || ""
+      );
+
+    if (
+      !aFirst ||
+      !bFirst ||
+      !aLast ||
+      !bLast
+    ) {
+      return null;
+    }
+
+    const lastDistance =
+      adminLevenshtein(
+        aLast,
+        bLast
+      );
+
+    const firstDistance =
+      adminLevenshtein(
+        aFirst,
+        bFirst
+      );
+
+    const sameLast =
+      aLast === bLast;
+
+    const sameFirst =
+      aFirst === bFirst;
+
+    const relatedFirst =
+      adminFirstNamesRelated(
+        aFirst,
+        bFirst
+      );
+
+    /*
+      Avoid flagging ordinary shared surnames. A pair only
+      becomes a candidate when either the surname is exact
+      and the first names are plausibly related, or both
+      names are extremely close typographically.
+    */
+    let confidence = null;
+    let reason = "";
+
+    if (
+      sameLast &&
+      relatedFirst
+    ) {
+      confidence =
+        sameFirst
+          ? "Exact"
+          : "High";
+
+      reason =
+        sameFirst
+          ? "same normalized name"
+          : "same surname; similar or familiar first names";
+    } else if (
+      lastDistance <= 1 &&
+      firstDistance <= 1
+    ) {
+      confidence = "High";
+      reason =
+        "minor spelling difference in both names";
+    } else if (
+      sameLast &&
+      firstDistance <= 2
+    ) {
+      confidence = "Medium";
+      reason =
+        "same surname; close first-name spelling";
+    } else if (
+      lastDistance <= 1 &&
+      relatedFirst
+    ) {
+      confidence = "Medium";
+      reason =
+        "very similar surname; related first names";
+    }
+
+    if (!confidence) {
+      return null;
+    }
+
+    const ranking = {
+      "Exact": 0,
+      "High": 1,
+      "Medium": 2
+    };
+
+    return {
+      confidence,
+      reason,
+      rank:
+        ranking[confidence],
+      firstDistance,
+      lastDistance
+    };
+  }
+
+
+  async function scanAllPotentialDuplicatePeople() {
+    const output =
+      document.getElementById(
+        "identityDiagnosticResults"
+      );
+
+    const button =
+      document.getElementById(
+        "scanAllDuplicatesBtn"
+      );
+
+    if (!output) {
+      return;
+    }
+
+    if (button) {
+      button.disabled = true;
+      button.textContent =
+        "Scanning…";
+    }
+
+    output.innerHTML =
+      "<p>Scanning all people for likely duplicate identities…</p>";
+
+    try {
+      const people =
+        await adminFetchPeople();
+
+      const candidates = [];
+
+      for (
+        let i = 0;
+        i < people.length;
+        i++
+      ) {
+        for (
+          let j = i + 1;
+          j < people.length;
+          j++
+        ) {
+          const score =
+            adminDuplicateScore(
+              people[i],
+              people[j]
+            );
+
+          if (!score) {
+            continue;
+          }
+
+          candidates.push({
+            a: people[i],
+            b: people[j],
+            ...score
+          });
+        }
+      }
+
+      candidates.sort(
+        (x, y) => {
+          if (
+            x.rank !== y.rank
+          ) {
+            return x.rank - y.rank;
+          }
+
+          const lastCompare =
+            String(
+              x.a.last_name || ""
+            ).localeCompare(
+              String(
+                y.a.last_name || ""
+              )
+            );
+
+          if (lastCompare) {
+            return lastCompare;
+          }
+
+          return adminDisplayName(
+            x.a
+          ).localeCompare(
+            adminDisplayName(
+              y.a
+            )
+          );
+        }
+      );
+
+      if (!candidates.length) {
+        output.innerHTML =
+          "<p>No likely duplicate people were found.</p>";
+        return;
+      }
+
+      const confidenceClass =
+        value =>
+          value === "Exact"
+            ? "preview-error"
+            : "";
+
+      output.innerHTML = `
+        <h4>Potential Duplicate People (${candidates.length})</h4>
+        <p>This is a review list only. Nothing has been merged or changed.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Confidence</th>
+              <th>Person 1</th>
+              <th>ID</th>
+              <th>Person 2</th>
+              <th>ID</th>
+              <th>Why flagged</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${candidates.map(
+              item => `
+                <tr>
+                  <td class="${confidenceClass(item.confidence)}">${escapeAdminHtml(item.confidence)}</td>
+                  <td>${escapeAdminHtml(adminDisplayName(item.a))}</td>
+                  <td>${item.a.id}</td>
+                  <td>${escapeAdminHtml(adminDisplayName(item.b))}</td>
+                  <td>${item.b.id}</td>
+                  <td>${escapeAdminHtml(item.reason)}</td>
+                </tr>
+              `
+            ).join("")}
+          </tbody>
+        </table>
+      `;
+
+    } catch (error) {
+      console.error(error);
+
+      output.innerHTML =
+        `<p>${escapeAdminHtml(
+          error?.message ||
+          "Duplicate scan failed."
+        )}</p>`;
+
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent =
+          "Scan All People";
+      }
+    }
+  }
 
 
   async function runIdentityDiagnostic() {
