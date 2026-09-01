@@ -5,7 +5,8 @@ document.addEventListener("DOMContentLoaded", async function () {
   let throughYearSelect = null;
 
   /* Convert the original single Academic Year filter into an inclusive
-     From AY / Through AY range without requiring an index.html change. */
+     From AY / Through AY range. "All Years" in either menu means that
+     end of the range is unrestricted. */
   if (yearSelect) {
     yearSelect.id = "yearFrom";
     yearSelect.setAttribute("aria-label", "From Academic Year");
@@ -27,6 +28,13 @@ document.addEventListener("DOMContentLoaded", async function () {
     const throughWrapper =
       document.createElement("div");
 
+    const yearContainer = yearSelect.parentElement;
+    throughWrapper.className =
+      yearContainer ? yearContainer.className : "field";
+
+    throughYearSelect.className =
+      yearSelect.className;
+
     const throughLabel =
       document.createElement("label");
 
@@ -36,20 +44,18 @@ document.addEventListener("DOMContentLoaded", async function () {
     throughWrapper.appendChild(throughLabel);
     throughWrapper.appendChild(throughYearSelect);
 
-    const yearContainer = yearSelect.parentElement;
-
     if (yearContainer && yearContainer.parentElement) {
       yearContainer.insertAdjacentElement("afterend", throughWrapper);
 
-      const note = document.createElement("div");
-      note.className = "ay-range-note";
-      note.textContent =
-        "Leave both Academic Year fields blank to search all academic years in the database.";
-      note.style.fontSize = "0.9rem";
-      note.style.marginTop = "0.35rem";
-      note.style.opacity = "0.8";
+      const searchGrid = yearContainer.parentElement;
+      searchGrid.style.gridTemplateColumns =
+        "repeat(4, minmax(0, 1fr))";
 
-      throughWrapper.insertAdjacentElement("afterend", note);
+      const searchField =
+        searchGrid.querySelector(".search-field");
+      if (searchField) {
+        searchField.style.gridColumn = "1 / -1";
+      }
     }
   }
   const semesterSelect = document.getElementById("semester");
@@ -5218,11 +5224,11 @@ document.addEventListener("DOMContentLoaded", async function () {
   function populateFilters() {
 
     yearSelect.innerHTML =
-      '<option value=""></option>';
+      '<option value="">All Years</option>';
 
     if (throughYearSelect) {
       throughYearSelect.innerHTML =
-        '<option value=""></option>';
+        '<option value="">All Years</option>';
     }
 
     semesterSelect.innerHTML =
