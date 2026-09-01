@@ -2,6 +2,56 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   const searchInput = document.getElementById("search");
   const yearSelect = document.getElementById("year");
+  let throughYearSelect = null;
+
+  /* Convert the original single Academic Year filter into an inclusive
+     From AY / Through AY range without requiring an index.html change. */
+  if (yearSelect) {
+    yearSelect.id = "yearFrom";
+    yearSelect.setAttribute("aria-label", "From Academic Year");
+
+    const originalLabel =
+      document.querySelector('label[for="year"]');
+
+    if (originalLabel) {
+      originalLabel.setAttribute("for", "yearFrom");
+      originalLabel.textContent = "From AY";
+    }
+
+    throughYearSelect =
+      document.createElement("select");
+
+    throughYearSelect.id = "yearThrough";
+    throughYearSelect.setAttribute("aria-label", "Through Academic Year");
+
+    const throughWrapper =
+      document.createElement("div");
+
+    const throughLabel =
+      document.createElement("label");
+
+    throughLabel.setAttribute("for", "yearThrough");
+    throughLabel.textContent = "Through AY";
+
+    throughWrapper.appendChild(throughLabel);
+    throughWrapper.appendChild(throughYearSelect);
+
+    const yearContainer = yearSelect.parentElement;
+
+    if (yearContainer && yearContainer.parentElement) {
+      yearContainer.insertAdjacentElement("afterend", throughWrapper);
+
+      const note = document.createElement("div");
+      note.className = "ay-range-note";
+      note.textContent =
+        "Leave both Academic Year fields blank to search all academic years in the database.";
+      note.style.fontSize = "0.9rem";
+      note.style.marginTop = "0.35rem";
+      note.style.opacity = "0.8";
+
+      throughWrapper.insertAdjacentElement("afterend", note);
+    }
+  }
   const semesterSelect = document.getElementById("semester");
   const typeSelect = document.getElementById("type");
   const searchBtn = document.getElementById("searchBtn");
@@ -5168,7 +5218,12 @@ document.addEventListener("DOMContentLoaded", async function () {
   function populateFilters() {
 
     yearSelect.innerHTML =
-      '<option value="">All years</option>';
+      '<option value=""></option>';
+
+    if (throughYearSelect) {
+      throughYearSelect.innerHTML =
+        '<option value=""></option>';
+    }
 
     semesterSelect.innerHTML =
       '<option value="">All semesters</option>';
@@ -5244,6 +5299,15 @@ document.addEventListener("DOMContentLoaded", async function () {
         yearSelect.appendChild(
           option
         );
+
+        if (throughYearSelect) {
+          const throughOption =
+            document.createElement("option");
+
+          throughOption.value = year;
+          throughOption.textContent = year;
+          throughYearSelect.appendChild(throughOption);
+        }
       });
 
 
@@ -5644,8 +5708,13 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   function passesFilters(event) {
 
-    const selectedYear =
+    const selectedFromYear =
       yearSelect.value;
+
+    const selectedThroughYear =
+      throughYearSelect
+        ? throughYearSelect.value
+        : "";
 
     const selectedSemester =
       semesterSelect.value;
@@ -5654,10 +5723,27 @@ document.addEventListener("DOMContentLoaded", async function () {
       typeSelect.value;
 
 
+    const eventYear =
+      String(event.academicYear || "");
+
+    const fromMatch =
+      !selectedFromYear ||
+      eventYear.localeCompare(
+        String(selectedFromYear),
+        undefined,
+        { numeric: true, sensitivity: "base" }
+      ) >= 0;
+
+    const throughMatch =
+      !selectedThroughYear ||
+      eventYear.localeCompare(
+        String(selectedThroughYear),
+        undefined,
+        { numeric: true, sensitivity: "base" }
+      ) <= 0;
+
     const yearMatch =
-      !selectedYear ||
-      event.academicYear ===
-        selectedYear;
+      fromMatch && throughMatch;
 
 
     const semesterMatch =
@@ -6254,6 +6340,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
       const hasFilter =
         yearSelect.value ||
+        (throughYearSelect && throughYearSelect.value) ||
         semesterSelect.value ||
         typeSelect.value;
 
@@ -6339,6 +6426,10 @@ document.addEventListener("DOMContentLoaded", async function () {
     yearSelect.value =
       "";
 
+    if (throughYearSelect) {
+      throughYearSelect.value = "";
+    }
+
     semesterSelect.value =
       "";
 
@@ -6414,6 +6505,13 @@ document.addEventListener("DOMContentLoaded", async function () {
     "change",
     runSearch
   );
+
+  if (throughYearSelect) {
+    throughYearSelect.addEventListener(
+      "change",
+      runSearch
+    );
+  }
 
 
   semesterSelect.addEventListener(
