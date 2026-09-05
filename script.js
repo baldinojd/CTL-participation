@@ -404,6 +404,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   let currentAdminUser = null;
   let currentAdminAuthorized = false;
+  let currentAdminCanCertify = false;
   let adminWorkspaceInitialized = false;
 
   /* =========================================================
@@ -415,6 +416,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   function showSignedOutState() {
     currentAdminUser = null;
     currentAdminAuthorized = false;
+    currentAdminCanCertify = false;
 
     if (adminIdentity) {
       adminIdentity.textContent = "";
@@ -550,7 +552,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       }
     }
 
-    return true;
+    return data;
   }
 
   async function refreshAdminState(user) {
@@ -559,12 +561,15 @@ document.addEventListener("DOMContentLoaded", async function () {
       return;
     }
 
-    const authorized =
+    const editor =
       await isAuthorizedEditor(user);
+
+    currentAdminCanCertify =
+      Boolean(editor?.can_certify);
 
     showSignedInState(
       user,
-      authorized
+      Boolean(editor)
     );
   }
 
@@ -618,6 +623,11 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     adminWorkspaceInitialized = true;
 
+    window.setTimeout(
+      refreshCertificationRequests,
+      0
+    );
+
     const inner =
       adminWorkspace.querySelector(
         ".admin-workspace-inner"
@@ -639,6 +649,7 @@ document.addEventListener("DOMContentLoaded", async function () {
           <button type="button" class="ctl-admin-tab" data-admin-panel="bulkEventsPanel">Bulk Semester Events</button>
           <button type="button" class="ctl-admin-tab" data-admin-panel="backupDataPanel">Backup Data</button>
           <button type="button" class="ctl-admin-tab" data-admin-panel="manageAdminsPanel">Manage Administrators</button>
+          <button id="certificationRequestsTab" type="button" class="ctl-admin-tab" data-admin-panel="certificationRequestsPanel" style="display:none;">Certification Requests</button>
           <button type="button" class="ctl-admin-tab" data-admin-panel="mergePeoplePanel">Merge People</button>
           <button type="button" class="ctl-admin-tab" data-admin-panel="identityDiagnosticPanel">Identity Diagnostic</button>
         </div>
@@ -766,6 +777,14 @@ document.addEventListener("DOMContentLoaded", async function () {
           </form>
 
           <div id="adminManagerList" class="ctl-admin-preview"></div>
+        </section>
+
+        <section id="certificationRequestsPanel" class="ctl-admin-panel">
+          <h3>Certification Requests</h3>
+          <div id="certificationPendingAlert" class="ctl-admin-message" style="display:none;"></div>
+          <div id="certificationRequestsList" class="ctl-admin-preview">
+            <p>Loading certification requests…</p>
+          </div>
         </section>
 
         <section id="mergePeoplePanel" class="ctl-admin-panel">
@@ -3346,6 +3365,175 @@ document.addEventListener("DOMContentLoaded", async function () {
     } finally {
       button.disabled = false;
     }
+  }
+
+
+  function certificationSnapshotTable(snapshot) {
+    if (!Array.isArray(snapshot) || snapshot.length === 0) {
+      return "<p>No result snapshot is available for this request.</p>";
+    }
+
+    const headers =
+      Object.keys(snapshot[0] || {});
+
+    return `
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              ${headers.map(header =>
+                `<th>${escapeAdminHtml(header)}</th>`
+              ).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            ${snapshot.map(row => `
+              <tr>
+                ${headers.map(header =>
+                  `<td>${escapeAdminHtml(row?.[header] ?? "")}</td>`
+                ).join("")}
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+
+  async function refreshCertificationRequests() {
+    const tab =
+      document.getElementById(
+        "certificationRequestsTab"
+      );
+
+    const list =
+      document.getElementById(
+        "certificationRequestsList"
+      );
+
+    if (!tab || !list) {
+      return;
+    }
+
+    tab.style.display =
+      currentAdminCanCertify ? "" : "none";
+
+    if (!currentAdminCanCertify) {
+      return;
+    }
+
+    const {
+      data,
+      error
+    } = await window.ctlSupabase
+      .from("certification_requests")
+      .select("*")
+      .order("requested_at", { ascending: false });
+
+    if (error) {
+      console.error(
+        "Certification requests could not be loaded:",
+        error
+      );
+
+      list.innerHTML =
+        "<p>Certification requests could not be loaded.</p>";
+      return;
+    }
+
+    const requests =
+      data || [];
+
+    const pending =
+      requests.filter(
+        request =>
+          request.status === "pending"
+      );
+
+    let badge =
+      document.getElementById(
+        "certificationGlobalAlert"
+      );
+
+    if (!badge) {
+      badge =
+        document.createElement("div");
+
+      badge.id =
+        "certificationGlobalAlert";
+
+      badge.className =
+        "ctl-admin-message";
+
+      const tabs =
+        tab.parentElement;
+
+      if (tabs) {
+        tabs.insertAdjacentElement(
+          "afterend",
+          badge
+        );
+      }
+    }
+
+    if (pending.length) {
+      badge.style.display = "";
+      badge.innerHTML =
+        `<strong>${pending.length} pending certification request${pending.length === 1 ? "" : "s"}.</strong> ` +
+        `Open Certification Requests to review.`;
+    } else {
+      badge.style.display = "none";
+      badge.textContent = "";
+    }
+
+    if (!requests.length) {
+      list.innerHTML =
+        "<p>There are no certification requests.</p>";
+      return;
+    }
+
+    list.innerHTML =
+      requests.map(request => {
+        const requested =
+          request.requested_at
+            ? new Date(request.requested_at).toLocaleString()
+            : "";
+
+        const range =
+          request.from_academic_year || request.through_academic_year
+            ? `${request.from_academic_year || "All Years"} through ${request.through_academic_year || "All Years"}`
+            : "All Years";
+
+        return `
+          <article class="ctl-certification-request" style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #ddd;">
+            <h4 style="margin-bottom:6px;">
+              Request #${request.id}: ${escapeAdminHtml(request.subject_person_name || "")}
+            </h4>
+            <p style="margin:4px 0;">
+              <strong>Status:</strong> ${escapeAdminHtml(request.status || "")}
+              &nbsp; | &nbsp;
+              <strong>Requested:</strong> ${escapeAdminHtml(requested)}
+            </p>
+            <p style="margin:4px 0;">
+              <strong>Requester:</strong> ${escapeAdminHtml(request.requester_name || "")}
+              (${escapeAdminHtml(request.requester_email || "")})
+            </p>
+            <p style="margin:4px 0 12px;">
+              <strong>Academic Years:</strong> ${escapeAdminHtml(range)}
+              ${request.semester ? ` &nbsp; | &nbsp; <strong>Semester:</strong> ${escapeAdminHtml(request.semester)}` : ""}
+              ${request.event_type ? ` &nbsp; | &nbsp; <strong>Event Type:</strong> ${escapeAdminHtml(request.event_type)}` : ""}
+            </p>
+
+            <details>
+              <summary style="cursor:pointer;font-weight:600;">Review requested results</summary>
+              <div style="margin-top:12px;">
+                ${certificationSnapshotTable(request.result_snapshot)}
+              </div>
+            </details>
+          </article>
+        `;
+      }).join("");
   }
 
 
