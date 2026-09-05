@@ -3504,14 +3504,38 @@ document.addEventListener("DOMContentLoaded", async function () {
       }
     }
 
+    const panelAlert =
+      document.getElementById(
+        "certificationPendingAlert"
+      );
+
     if (pending.length) {
-      badge.style.display = "";
+      const alertText =
+        `${pending.length} pending certification request${pending.length === 1 ? "" : "s"}.`;
+
+      badge.style.display = "block";
       badge.innerHTML =
-        `<strong>${pending.length} pending certification request${pending.length === 1 ? "" : "s"}.</strong> ` +
-        `Open Certification Requests to review.`;
+        `<strong>${alertText}</strong> Open Certification Requests to review.`;
+
+      if (panelAlert) {
+        panelAlert.style.display = "block";
+        panelAlert.innerHTML =
+          `<strong>${alertText}</strong>`;
+      }
+
+      tab.textContent =
+        `Certification Requests (${pending.length})`;
     } else {
       badge.style.display = "none";
       badge.textContent = "";
+
+      if (panelAlert) {
+        panelAlert.style.display = "none";
+        panelAlert.textContent = "";
+      }
+
+      tab.textContent =
+        "Certification Requests";
     }
 
     if (!requests.length) {
