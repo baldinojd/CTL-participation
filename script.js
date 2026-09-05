@@ -3415,6 +3415,51 @@ document.addEventListener("DOMContentLoaded", async function () {
   }
 
 
+  function certificationStatusLabel(request) {
+    if (request.status === "certified") {
+      const certifier =
+        request.certifier_display_name
+          ? escapeAdminHtml(request.certifier_display_name)
+          : "";
+
+      let certificationDate = "";
+
+      if (request.certified_at) {
+        const parsedDate =
+          new Date(request.certified_at);
+
+        if (!Number.isNaN(parsedDate.getTime())) {
+          certificationDate =
+            parsedDate.toLocaleDateString(
+              undefined,
+              {
+                year: "numeric",
+                month: "long",
+                day: "numeric"
+              }
+            );
+        }
+      }
+
+      if (certifier && certificationDate) {
+        return `Certified by ${certifier}, ${escapeAdminHtml(certificationDate)}`;
+      }
+
+      if (certifier) {
+        return `Certified by ${certifier}`;
+      }
+
+      if (certificationDate) {
+        return `Certified ${escapeAdminHtml(certificationDate)}`;
+      }
+
+      return "Certified";
+    }
+
+    return escapeAdminHtml(request.status || "");
+  }
+
+
   function certificationSnapshotTable(snapshot) {
     if (!Array.isArray(snapshot) || snapshot.length === 0) {
       return "<p>No result snapshot is available for this request.</p>";
@@ -3492,8 +3537,42 @@ document.addEventListener("DOMContentLoaded", async function () {
       return;
     }
 
-    const requests =
+    let requests =
       data || [];
+
+    const certifierIds =
+      [...new Set(
+        requests
+          .map(request => request.certified_by)
+          .filter(Boolean)
+      )];
+
+    if (certifierIds.length) {
+      const {
+        data: certifierRows,
+        error: certifierError
+      } = await window.ctlSupabase
+        .from("authorized_editors")
+        .select("auth_user_id, display_name")
+        .in("auth_user_id", certifierIds);
+
+      if (!certifierError && Array.isArray(certifierRows)) {
+        const certifierMap =
+          new Map(
+            certifierRows.map(row => [
+              row.auth_user_id,
+              row.display_name || ""
+            ])
+          );
+
+        requests =
+          requests.map(request => ({
+            ...request,
+            certifier_display_name:
+              certifierMap.get(request.certified_by) || ""
+          }));
+      }
+    }
 
     const pending =
       requests.filter(
@@ -3619,7 +3698,7 @@ document.addEventListener("DOMContentLoaded", async function () {
               Request #${request.id}: ${escapeAdminHtml(request.subject_person_name || "")}
             </h4>
             <p style="margin:4px 0;">
-              <strong>Status:</strong> ${escapeAdminHtml(request.status || "")}
+              <strong>Status:</strong> ${certificationStatusLabel(request)}
               &nbsp; | &nbsp;
               <strong>Requested:</strong> ${escapeAdminHtml(requested)}
             </p>
