@@ -489,7 +489,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     let query =
       window.ctlSupabase
         .from("authorized_editors")
-        .select("id, auth_user_id, email, display_name, active, is_super_admin, can_certify")
+        .select("id, auth_user_id, email, display_name, active, is_super_admin")
         .eq("active", true);
 
     if (email) {
@@ -564,13 +564,40 @@ document.addEventListener("DOMContentLoaded", async function () {
     const editor =
       await isAuthorizedEditor(user);
 
-    currentAdminCanCertify =
-      Boolean(editor?.can_certify);
+    currentAdminCanCertify = false;
+
+    if (editor) {
+      const {
+        data: certificationEditor,
+        error: certificationPermissionError
+      } = await window.ctlSupabase
+        .from("authorized_editors")
+        .select("can_certify")
+        .eq("id", editor.id)
+        .maybeSingle();
+
+      if (certificationPermissionError) {
+        console.error(
+          "Certification permission check failed:",
+          certificationPermissionError
+        );
+      } else {
+        currentAdminCanCertify =
+          Boolean(certificationEditor?.can_certify);
+      }
+    }
 
     showSignedInState(
       user,
       Boolean(editor)
     );
+
+    if (editor) {
+      window.setTimeout(
+        refreshCertificationRequests,
+        0
+      );
+    }
   }
 
   async function initializeAdminAuth() {
