@@ -3582,9 +3582,298 @@ document.addEventListener("DOMContentLoaded", async function () {
                 ${certificationSnapshotTable(request.result_snapshot)}
               </div>
             </details>
+
+            ${request.status === "pending" || request.status === "reviewed" ? `
+              <div class="ctl-admin-actions" style="margin-top:14px;">
+                <button
+                  type="button"
+                  class="primary ctl-generate-certification-btn"
+                  data-request-id="${request.id}"
+                >
+                  Generate Certified PDF
+                </button>
+                <button
+                  type="button"
+                  class="secondary ctl-clear-certification-btn"
+                  data-request-id="${request.id}"
+                >
+                  Clear Request
+                </button>
+              </div>
+            ` : ""}
           </article>
         `;
       }).join("");
+
+    list
+      .querySelectorAll(
+        ".ctl-generate-certification-btn"
+      )
+      .forEach(function (button) {
+        button.addEventListener(
+          "click",
+          async function () {
+            await generateCertifiedResultsPdf(
+              Number(button.dataset.requestId),
+              requests
+            );
+          }
+        );
+      });
+
+    list
+      .querySelectorAll(
+        ".ctl-clear-certification-btn"
+      )
+      .forEach(function (button) {
+        button.addEventListener(
+          "click",
+          async function () {
+            await clearCertificationRequest(
+              Number(button.dataset.requestId)
+            );
+          }
+        );
+      });
+  }
+
+
+  async function setCertificationRequestStatus(
+    requestId,
+    status
+  ) {
+    const {
+      data,
+      error
+    } = await window.ctlSupabase
+      .rpc(
+        "update_certification_request_status",
+        {
+          p_request_id: requestId,
+          p_status: status
+        }
+      );
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  }
+
+
+  async function clearCertificationRequest(requestId) {
+    if (!window.confirm(
+      "Clear this certification request? It will remain in the certification history with a declined status."
+    )) {
+      return;
+    }
+
+    try {
+      await setCertificationRequestStatus(
+        requestId,
+        "declined"
+      );
+
+      setAdminMessage(
+        `Certification request #${requestId} cleared.`
+      );
+
+      await refreshCertificationRequests();
+    } catch (error) {
+      console.error(error);
+      setAdminMessage(
+        error?.message ||
+        "Certification request could not be cleared.",
+        true
+      );
+    }
+  }
+
+
+  function certificationPrintDocument(
+    request,
+    editor
+  ) {
+    const snapshot =
+      Array.isArray(request.result_snapshot)
+        ? request.result_snapshot
+        : [];
+
+    const headers =
+      snapshot.length
+        ? Object.keys(snapshot[0])
+        : [];
+
+    const certificationDate =
+      new Date().toLocaleDateString(
+        undefined,
+        {
+          year: "numeric",
+          month: "long",
+          day: "numeric"
+        }
+      );
+
+    const range =
+      request.from_academic_year || request.through_academic_year
+        ? `${request.from_academic_year || "All Years"} through ${request.through_academic_year || "All Years"}`
+        : "All Academic Years";
+
+    const rows =
+      snapshot.map(row => `
+        <tr>
+          ${headers.map(header =>
+            `<td>${escapeAdminHtml(row?.[header] ?? "")}</td>`
+          ).join("")}
+        </tr>
+      `).join("");
+
+    return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Certified CTL Participation Results</title>
+<style>
+  @page { size: landscape; margin: 0.55in; }
+  body { font-family: Arial, Helvetica, sans-serif; color:#111; font-size:11px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  h2 { font-size:16px; margin:0 0 18px; font-weight:normal; }
+  .meta { margin:0 0 18px; line-height:1.5; }
+  table { width:100%; border-collapse:collapse; margin:12px 0 28px; }
+  th, td { border:1px solid #aaa; padding:6px; text-align:left; vertical-align:top; }
+  th { background:#eee; }
+  .certification { margin-top:28px; page-break-inside:avoid; }
+  .signature-line { width:320px; border-top:1px solid #111; margin-top:48px; padding-top:6px; }
+  .no-print { margin-bottom:16px; }
+  @media print { .no-print { display:none; } }
+</style>
+</head>
+<body>
+  <div class="no-print">
+    <button onclick="window.print()">Print / Save as PDF</button>
+  </div>
+
+  <h1>Center for Teaching and Learning</h1>
+  <h2>Lackawanna College</h2>
+
+  <div class="meta">
+    <strong>Certified Participation Results:</strong>
+      ${escapeAdminHtml(request.subject_person_name || "")}<br>
+    <strong>Academic Years:</strong> ${escapeAdminHtml(range)}<br>
+    ${request.semester ? `<strong>Semester:</strong> ${escapeAdminHtml(request.semester)}<br>` : ""}
+    ${request.event_type ? `<strong>Event Type:</strong> ${escapeAdminHtml(request.event_type)}<br>` : ""}
+    <strong>Certification Date:</strong> ${escapeAdminHtml(certificationDate)}
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        ${headers.map(header =>
+          `<th>${escapeAdminHtml(header)}</th>`
+        ).join("")}
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+
+  <div class="certification">
+    <p>
+      I certify that the participation records shown above accurately reflect
+      the records maintained by the Lackawanna College Center for Teaching and
+      Learning as of ${escapeAdminHtml(certificationDate)}.
+    </p>
+
+    <div class="signature-line">
+      ${escapeAdminHtml(editor?.display_name || "")}<br>
+      ${escapeAdminHtml(editor?.title || "Center for Teaching and Learning Administrator")}<br>
+      Lackawanna College
+    </div>
+  </div>
+</body>
+</html>`;
+  }
+
+
+  async function generateCertifiedResultsPdf(
+    requestId,
+    requests
+  ) {
+    const request =
+      requests.find(
+        item => Number(item.id) === Number(requestId)
+      );
+
+    if (!request) {
+      setAdminMessage(
+        "Certification request could not be found.",
+        true
+      );
+      return;
+    }
+
+    try {
+      const editor =
+        await adminCurrentEditorRecord();
+
+      if (!editor?.can_certify) {
+        throw new Error(
+          "Your account does not have certification permission."
+        );
+      }
+
+      if (!editor?.display_name) {
+        throw new Error(
+          "Your administrator record needs a display name before certification."
+        );
+      }
+
+      if (!editor?.title) {
+        throw new Error(
+          "Your administrator record needs a title before certification."
+        );
+      }
+
+      const printWindow =
+        window.open(
+          "",
+          "_blank"
+        );
+
+      if (!printWindow) {
+        throw new Error(
+          "The certification window was blocked by the browser. Allow pop-ups for this site and try again."
+        );
+      }
+
+      printWindow.document.open();
+      printWindow.document.write(
+        certificationPrintDocument(
+          request,
+          editor
+        )
+      );
+      printWindow.document.close();
+
+      await setCertificationRequestStatus(
+        requestId,
+        "certified"
+      );
+
+      setAdminMessage(
+        `Certification request #${requestId} marked certified. Use Print / Save as PDF in the certification window.`
+      );
+
+      await refreshCertificationRequests();
+
+    } catch (error) {
+      console.error(error);
+      setAdminMessage(
+        error?.message ||
+        "Certified results could not be generated.",
+        true
+      );
+    }
   }
 
 
@@ -3598,7 +3887,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       error
     } = await window.ctlSupabase
       .from("authorized_editors")
-      .select("id, auth_user_id, email, display_name, active, is_super_admin, can_certify")
+      .select("id, auth_user_id, email, display_name, active, is_super_admin, can_certify, title")
       .eq("auth_user_id", currentAdminUser.id)
       .eq("active", true)
       .maybeSingle();
@@ -3656,7 +3945,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       error
     } = await window.ctlSupabase
       .from("authorized_editors")
-      .select("id, auth_user_id, email, display_name, active, is_super_admin, can_certify")
+      .select("id, auth_user_id, email, display_name, active, is_super_admin, can_certify, title")
       .order("display_name", { ascending: true });
 
     if (error) {
