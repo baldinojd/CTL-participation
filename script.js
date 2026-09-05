@@ -3764,6 +3764,13 @@ document.addEventListener("DOMContentLoaded", async function () {
     <button onclick="window.print()">Print / Save as PDF</button>
   </div>
 
+  <div style="margin-bottom:18px;">
+    <img
+      src="ctl-logo.PNG"
+      alt="Center for Teaching and Learning"
+      style="max-width:320px;max-height:95px;object-fit:contain;"
+    >
+  </div>
   <h1>Center for Teaching and Learning</h1>
   <h2>Lackawanna College</h2>
 
@@ -3789,9 +3796,9 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   <div class="certification">
     <p>
-      I certify that the participation records shown above accurately reflect
-      the records maintained by the Lackawanna College Center for Teaching and
-      Learning as of ${escapeAdminHtml(certificationDate)}.
+      The participation records shown above are certified as an accurate
+      reflection of the records maintained by the Lackawanna College Center
+      for Teaching and Learning as of ${escapeAdminHtml(certificationDate)}.
     </p>
 
     <div class="signature-line">
@@ -3857,11 +3864,16 @@ document.addEventListener("DOMContentLoaded", async function () {
       }
 
       printWindow.document.open();
-      printWindow.document.write(
+      const certificationHtml =
         certificationPrintDocument(
           request,
           editor
-        )
+        ).replace(
+          "<head>",
+          `<head><base href="${escapeAdminHtml(window.location.href)}">`
+        );
+      printWindow.document.write(
+        certificationHtml
       );
       printWindow.document.close();
 
