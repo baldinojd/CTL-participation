@@ -4205,14 +4205,13 @@ document.addEventListener("DOMContentLoaded", async function () {
       const {
         error
       } = await window.ctlSupabase
-        .from("authorized_editors")
-        .update({
-          title: String(title || "").trim() || null,
-          post_nominals: String(postNominals || "").trim() || null
-        })
-        .eq(
-          "id",
-          editorId
+        .rpc(
+          "update_authorized_editor_profile",
+          {
+            p_editor_id: editorId,
+            p_title: String(title || "").trim(),
+            p_post_nominals: String(postNominals || "").trim()
+          }
         );
 
       if (error) {
