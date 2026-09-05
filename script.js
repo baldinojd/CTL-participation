@@ -129,6 +129,9 @@ document.addEventListener("DOMContentLoaded", async function () {
             Submit these participation results to the Center for Teaching and Learning
             for review and certification.
           </p>
+          <p>
+            Please allow 5–10 business days for processing.
+          </p>
 
           <label for="certificationRequesterName">Your name</label>
           <input
@@ -350,18 +353,13 @@ document.addEventListener("DOMContentLoaded", async function () {
           ? data[0].request_id
           : "";
 
-      certificationMessage.textContent =
-        requestId
-          ? "Request submitted successfully. Request #" + requestId + "."
-          : "Request submitted successfully.";
-
       certificationForm.reset();
+      certificationDialog.close();
 
-      window.setTimeout(
-        function () {
-          certificationDialog.close();
-        },
-        1800
+      window.alert(
+        "Your request has been submitted successfully" +
+        (requestId ? " (Request #" + requestId + ")" : "") +
+        ".\n\nA CTL Administrator will send your certified results by email. Please allow 5–10 business days for processing.\n\nIf you need to follow up on your request, email ctl@lackawanna.edu."
       );
 
     } catch (error) {
@@ -489,7 +487,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     let query =
       window.ctlSupabase
         .from("authorized_editors")
-        .select("id, auth_user_id, email, display_name, active, is_super_admin")
+        .select("id, auth_user_id, email, display_name, active, is_super_admin, can_certify")
         .eq("active", true);
 
     if (email) {
@@ -752,6 +750,13 @@ document.addEventListener("DOMContentLoaded", async function () {
               <div class="ctl-admin-field">
                 <label for="newAdminEmail">Lackawanna Email</label>
                 <input id="newAdminEmail" type="email" placeholder="name@lackawanna.edu" required>
+              </div>
+
+              <div class="ctl-admin-field">
+                <label>
+                  <input id="newAdminCanCertify" type="checkbox">
+                  Can certify results
+                </label>
               </div>
             </div>
 
@@ -3354,7 +3359,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       error
     } = await window.ctlSupabase
       .from("authorized_editors")
-      .select("id, auth_user_id, email, display_name, active, is_super_admin")
+      .select("id, auth_user_id, email, display_name, active, is_super_admin, can_certify")
       .eq("auth_user_id", currentAdminUser.id)
       .eq("active", true)
       .maybeSingle();
@@ -3412,7 +3417,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       error
     } = await window.ctlSupabase
       .from("authorized_editors")
-      .select("id, auth_user_id, email, display_name, active, is_super_admin")
+      .select("id, auth_user_id, email, display_name, active, is_super_admin, can_certify")
       .order("display_name", { ascending: true });
 
     if (error) {
@@ -3434,6 +3439,7 @@ document.addEventListener("DOMContentLoaded", async function () {
             <th>Microsoft Account</th>
             <th>Status</th>
             <th>Role</th>
+            <th>Certification</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -3446,6 +3452,17 @@ document.addEventListener("DOMContentLoaded", async function () {
                 <td>${row.auth_user_id ? "Linked" : "Awaiting first sign-in"}</td>
                 <td>${row.active ? "Active" : "Inactive"}</td>
                 <td>${row.is_super_admin ? "Super Admin" : "Administrator"}</td>
+                <td>
+                  <label style="white-space:nowrap;">
+                    <input
+                      type="checkbox"
+                      class="ctl-admin-certify-toggle"
+                      data-editor-id="${row.id}"
+                      ${row.can_certify ? "checked" : ""}
+                    >
+                    Can certify
+                  </label>
+                </td>
                 <td>
                   ${
                     row.is_super_admin
@@ -3475,6 +3492,22 @@ document.addEventListener("DOMContentLoaded", async function () {
           }
         );
       });
+
+    list
+      .querySelectorAll(
+        ".ctl-admin-certify-toggle"
+      )
+      .forEach(function (checkbox) {
+        checkbox.addEventListener(
+          "change",
+          async function () {
+            await setAdministratorCertificationPermission(
+              Number(checkbox.dataset.editorId),
+              checkbox.checked
+            );
+          }
+        );
+      });
   }
 
 
@@ -3491,6 +3524,11 @@ document.addEventListener("DOMContentLoaded", async function () {
       document.getElementById(
         "newAdminEmail"
       ).value.trim().toLowerCase();
+
+    const canCertify =
+      document.getElementById(
+        "newAdminCanCertify"
+      )?.checked || false;
 
     if (!name || !email) {
       setAdminMessage(
@@ -3517,7 +3555,8 @@ document.addEventListener("DOMContentLoaded", async function () {
           email,
           display_name: name,
           active: true,
-          is_super_admin: false
+          is_super_admin: false,
+          can_certify: canCertify
         });
 
       if (error) {
@@ -3542,6 +3581,51 @@ document.addEventListener("DOMContentLoaded", async function () {
         "Administrator could not be added.",
         true
       );
+    }
+  }
+
+
+  async function setAdministratorCertificationPermission(
+    editorId,
+    canCertify
+  ) {
+    try {
+      const {
+        error
+      } = await window.ctlSupabase
+        .from("authorized_editors")
+        .update({
+          can_certify: canCertify
+        })
+        .eq(
+          "id",
+          editorId
+        );
+
+      if (error) {
+        throw new Error(
+          "Certification permission could not be changed: " +
+          error.message
+        );
+      }
+
+      setAdminMessage(
+        canCertify
+          ? "Certification permission granted."
+          : "Certification permission removed."
+      );
+
+      await refreshAdminManager();
+
+    } catch (error) {
+      console.error(error);
+      setAdminMessage(
+        error?.message ||
+        "Certification permission could not be changed.",
+        true
+      );
+
+      await refreshAdminManager();
     }
   }
 
