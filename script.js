@@ -70,6 +70,328 @@ document.addEventListener("DOMContentLoaded", async function () {
   const personChoices = document.getElementById("personChoices");
   const personSummary = document.getElementById("personSummary");
 
+  /* =========================================================
+     CERTIFIED RESULTS REQUEST
+     Available only for person-search results.
+     ========================================================= */
+
+  let certificationRequestBtn = null;
+  let certificationDialog = null;
+  let certificationForm = null;
+  let certificationMessage = null;
+
+  function initializeCertificationRequestUI() {
+    const exportTools =
+      document.getElementById("exportTools");
+
+    if (!exportTools) {
+      return;
+    }
+
+    certificationRequestBtn =
+      document.getElementById("requestCertifiedResultsBtn");
+
+    if (!certificationRequestBtn) {
+      certificationRequestBtn =
+        document.createElement("button");
+
+      certificationRequestBtn.id =
+        "requestCertifiedResultsBtn";
+
+      certificationRequestBtn.type =
+        "button";
+
+      certificationRequestBtn.textContent =
+        "Request Certified Results";
+
+      certificationRequestBtn.style.display =
+        "none";
+
+      exportTools.appendChild(
+        certificationRequestBtn
+      );
+    }
+
+    certificationDialog =
+      document.getElementById("certificationRequestDialog");
+
+    if (!certificationDialog) {
+      certificationDialog =
+        document.createElement("dialog");
+
+      certificationDialog.id =
+        "certificationRequestDialog";
+
+      certificationDialog.innerHTML = `
+        <form id="certificationRequestForm" method="dialog" style="min-width:min(520px,85vw);">
+          <h2 style="margin-top:0;">Request Certified Results</h2>
+          <p>
+            Submit these participation results to the Center for Teaching and Learning
+            for review and certification.
+          </p>
+
+          <label for="certificationRequesterName">Your name</label>
+          <input
+            id="certificationRequesterName"
+            type="text"
+            autocomplete="name"
+            required
+            style="width:100%;box-sizing:border-box;margin:6px 0 14px;"
+          >
+
+          <label for="certificationRequesterEmail">Your email</label>
+          <input
+            id="certificationRequesterEmail"
+            type="email"
+            autocomplete="email"
+            required
+            style="width:100%;box-sizing:border-box;margin:6px 0 14px;"
+          >
+
+          <div id="certificationRequestMessage" style="min-height:1.4em;margin-bottom:12px;"></div>
+
+          <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button id="cancelCertificationRequestBtn" type="button">Cancel</button>
+            <button id="submitCertificationRequestBtn" type="submit" class="primary">
+              Submit Request
+            </button>
+          </div>
+        </form>
+      `;
+
+      document.body.appendChild(
+        certificationDialog
+      );
+    }
+
+    certificationForm =
+      document.getElementById(
+        "certificationRequestForm"
+      );
+
+    certificationMessage =
+      document.getElementById(
+        "certificationRequestMessage"
+      );
+
+    const cancelBtn =
+      document.getElementById(
+        "cancelCertificationRequestBtn"
+      );
+
+    if (
+      certificationRequestBtn &&
+      !certificationRequestBtn.dataset.bound
+    ) {
+      certificationRequestBtn.dataset.bound =
+        "true";
+
+      certificationRequestBtn.addEventListener(
+        "click",
+        function () {
+          if (!selectedPerson) {
+            window.alert(
+              "Certified Results are available for person searches."
+            );
+            return;
+          }
+
+          if (certificationMessage) {
+            certificationMessage.textContent =
+              "";
+          }
+
+          certificationDialog.showModal();
+        }
+      );
+    }
+
+    if (
+      cancelBtn &&
+      !cancelBtn.dataset.bound
+    ) {
+      cancelBtn.dataset.bound =
+        "true";
+
+      cancelBtn.addEventListener(
+        "click",
+        function () {
+          certificationDialog.close();
+        }
+      );
+    }
+
+    if (
+      certificationForm &&
+      !certificationForm.dataset.bound
+    ) {
+      certificationForm.dataset.bound =
+        "true";
+
+      certificationForm.addEventListener(
+        "submit",
+        submitCertificationRequest
+      );
+    }
+  }
+
+  function getCertificationSnapshot() {
+    const headers =
+      Array.from(
+        head.querySelectorAll("th")
+      ).map(
+        cell =>
+          cell.textContent.trim()
+      );
+
+    return Array.from(
+      body.querySelectorAll("tr")
+    ).map(row => {
+      const values =
+        Array.from(
+          row.querySelectorAll("td")
+        ).map(
+          cell =>
+            cell.textContent.trim()
+        );
+
+      const record = {};
+
+      headers.forEach(
+        (header, index) => {
+          record[header || ("Column " + (index + 1))] =
+            values[index] || "";
+        }
+      );
+
+      return record;
+    });
+  }
+
+  async function submitCertificationRequest(event) {
+    event.preventDefault();
+
+    if (
+      !window.ctlSupabase ||
+      !selectedPerson
+    ) {
+      return;
+    }
+
+    const requesterName =
+      document.getElementById(
+        "certificationRequesterName"
+      ).value.trim();
+
+    const requesterEmail =
+      document.getElementById(
+        "certificationRequesterEmail"
+      ).value.trim();
+
+    const snapshot =
+      getCertificationSnapshot();
+
+    if (!snapshot.length) {
+      certificationMessage.textContent =
+        "There are no displayed results to certify.";
+      return;
+    }
+
+    const submitBtn =
+      document.getElementById(
+        "submitCertificationRequestBtn"
+      );
+
+    submitBtn.disabled = true;
+    certificationMessage.textContent =
+      "Submitting request...";
+
+    try {
+      const subjectName =
+        displayPersonName(
+          selectedPerson
+        );
+
+      const {
+        data,
+        error
+      } = await window.ctlSupabase.rpc(
+        "create_certification_request",
+        {
+          p_requester_name:
+            requesterName,
+          p_requester_email:
+            requesterEmail,
+          p_subject_person_name:
+            subjectName,
+          p_search_query:
+            searchInput.value.trim(),
+          p_from_academic_year:
+            yearSelect.value || "",
+          p_through_academic_year:
+            throughYearSelect
+              ? (throughYearSelect.value || "")
+              : "",
+          p_semester:
+            semesterSelect.value || "",
+          p_event_type:
+            typeSelect.value || "",
+          p_result_snapshot:
+            snapshot
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      const requestId =
+        Array.isArray(data) && data.length
+          ? data[0].request_id
+          : "";
+
+      certificationMessage.textContent =
+        requestId
+          ? "Request submitted successfully. Request #" + requestId + "."
+          : "Request submitted successfully.";
+
+      certificationForm.reset();
+
+      window.setTimeout(
+        function () {
+          certificationDialog.close();
+        },
+        1800
+      );
+
+    } catch (error) {
+      console.error(
+        "Certification request failed:",
+        error
+      );
+
+      certificationMessage.textContent =
+        "The request could not be submitted. Please try again.";
+    } finally {
+      submitBtn.disabled = false;
+    }
+  }
+
+  function updateCertificationButton(personMode, hasResults) {
+    initializeCertificationRequestUI();
+
+    if (!certificationRequestBtn) {
+      return;
+    }
+
+    certificationRequestBtn.style.display =
+      personMode && hasResults
+        ? ""
+        : "none";
+  }
+
+  initializeCertificationRequestUI();
+
   const adminSignInBtn = document.getElementById("adminSignInBtn");
   const adminSignOutBtn = document.getElementById("adminSignOutBtn");
   const adminIdentity = document.getElementById("adminIdentity");
@@ -6126,6 +6448,11 @@ document.addEventListener("DOMContentLoaded", async function () {
       results.length === 0
     ) {
 
+      updateCertificationButton(
+        personMode,
+        false
+      );
+
       empty.style.display =
         "block";
 
@@ -6138,6 +6465,11 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     empty.style.display =
       "none";
+
+    updateCertificationButton(
+      personMode,
+      true
+    );
 
 
     const orderedResults =
@@ -6444,6 +6776,11 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     selectedPerson =
       "";
+
+    updateCertificationButton(
+      false,
+      false
+    );
 
 
     hidePersonChoices();
