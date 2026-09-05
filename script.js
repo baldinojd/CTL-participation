@@ -791,6 +791,16 @@ document.addEventListener("DOMContentLoaded", async function () {
               </div>
 
               <div class="ctl-admin-field">
+                <label for="newAdminTitle">Title</label>
+                <input id="newAdminTitle" type="text" placeholder="Director, Center for Teaching and Learning">
+              </div>
+
+              <div class="ctl-admin-field">
+                <label for="newAdminPostNominals">Post-nominals</label>
+                <input id="newAdminPostNominals" type="text" placeholder="Ph.D., M.Ed.">
+              </div>
+
+              <div class="ctl-admin-field">
                 <label>
                   <input id="newAdminCanCertify" type="checkbox">
                   Can certify results
@@ -3785,7 +3795,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     </p>
 
     <div class="signature-line">
-      ${escapeAdminHtml(editor?.display_name || "")}<br>
+      ${escapeAdminHtml(editor?.display_name || "")}${editor?.post_nominals ? ", " + escapeAdminHtml(editor.post_nominals) : ""}<br>
       ${escapeAdminHtml(editor?.title || "Center for Teaching and Learning Administrator")}<br>
       Lackawanna College
     </div>
@@ -3887,7 +3897,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       error
     } = await window.ctlSupabase
       .from("authorized_editors")
-      .select("id, auth_user_id, email, display_name, active, is_super_admin, can_certify, title")
+      .select("id, auth_user_id, email, display_name, active, is_super_admin, can_certify, title, post_nominals")
       .eq("auth_user_id", currentAdminUser.id)
       .eq("active", true)
       .maybeSingle();
@@ -3945,7 +3955,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       error
     } = await window.ctlSupabase
       .from("authorized_editors")
-      .select("id, auth_user_id, email, display_name, active, is_super_admin, can_certify, title")
+      .select("id, auth_user_id, email, display_name, active, is_super_admin, can_certify, title, post_nominals")
       .order("display_name", { ascending: true });
 
     if (error) {
@@ -3964,6 +3974,8 @@ document.addEventListener("DOMContentLoaded", async function () {
           <tr>
             <th>Name</th>
             <th>Email</th>
+            <th>Title</th>
+            <th>Post-nominals</th>
             <th>Microsoft Account</th>
             <th>Status</th>
             <th>Role</th>
@@ -3977,6 +3989,26 @@ document.addEventListener("DOMContentLoaded", async function () {
               <tr>
                 <td>${escapeAdminHtml(row.display_name || "")}</td>
                 <td>${escapeAdminHtml(row.email || "")}</td>
+                <td>
+                  <input
+                    type="text"
+                    class="ctl-admin-title-input"
+                    data-editor-id="${row.id}"
+                    value="${escapeAdminHtml(row.title || "")}"
+                    placeholder="Title"
+                    style="min-width:220px;"
+                  >
+                </td>
+                <td>
+                  <input
+                    type="text"
+                    class="ctl-admin-postnominals-input"
+                    data-editor-id="${row.id}"
+                    value="${escapeAdminHtml(row.post_nominals || "")}"
+                    placeholder="Post-nominals"
+                    style="min-width:140px;"
+                  >
+                </td>
                 <td>${row.auth_user_id ? "Linked" : "Awaiting first sign-in"}</td>
                 <td>${row.active ? "Active" : "Inactive"}</td>
                 <td>${row.is_super_admin ? "Super Admin" : "Administrator"}</td>
@@ -3990,6 +4022,15 @@ document.addEventListener("DOMContentLoaded", async function () {
                     >
                     Can certify
                   </label>
+                  <br>
+                  <button
+                    type="button"
+                    class="secondary ctl-admin-profile-save-btn"
+                    data-editor-id="${row.id}"
+                    style="margin-top:6px;"
+                  >
+                    Save Profile
+                  </button>
                 </td>
                 <td>
                   ${
@@ -4036,6 +4077,36 @@ document.addEventListener("DOMContentLoaded", async function () {
           }
         );
       });
+
+    list
+      .querySelectorAll(
+        ".ctl-admin-profile-save-btn"
+      )
+      .forEach(function (button) {
+        button.addEventListener(
+          "click",
+          async function () {
+            const editorId =
+              Number(button.dataset.editorId);
+
+            const titleInput =
+              list.querySelector(
+                `.ctl-admin-title-input[data-editor-id="${editorId}"]`
+              );
+
+            const postNominalsInput =
+              list.querySelector(
+                `.ctl-admin-postnominals-input[data-editor-id="${editorId}"]`
+              );
+
+            await saveAdministratorProfile(
+              editorId,
+              titleInput?.value || "",
+              postNominalsInput?.value || ""
+            );
+          }
+        );
+      });
   }
 
 
@@ -4052,6 +4123,16 @@ document.addEventListener("DOMContentLoaded", async function () {
       document.getElementById(
         "newAdminEmail"
       ).value.trim().toLowerCase();
+
+    const title =
+      document.getElementById(
+        "newAdminTitle"
+      )?.value.trim() || "";
+
+    const postNominals =
+      document.getElementById(
+        "newAdminPostNominals"
+      )?.value.trim() || "";
 
     const canCertify =
       document.getElementById(
@@ -4084,7 +4165,9 @@ document.addEventListener("DOMContentLoaded", async function () {
           display_name: name,
           active: true,
           is_super_admin: false,
-          can_certify: canCertify
+          can_certify: canCertify,
+          title: title || null,
+          post_nominals: postNominals || null
         });
 
       if (error) {
@@ -4107,6 +4190,49 @@ document.addEventListener("DOMContentLoaded", async function () {
       setAdminMessage(
         error?.message ||
         "Administrator could not be added.",
+        true
+      );
+    }
+  }
+
+
+  async function saveAdministratorProfile(
+    editorId,
+    title,
+    postNominals
+  ) {
+    try {
+      const {
+        error
+      } = await window.ctlSupabase
+        .from("authorized_editors")
+        .update({
+          title: String(title || "").trim() || null,
+          post_nominals: String(postNominals || "").trim() || null
+        })
+        .eq(
+          "id",
+          editorId
+        );
+
+      if (error) {
+        throw new Error(
+          "Administrator profile could not be saved: " +
+          error.message
+        );
+      }
+
+      setAdminMessage(
+        "Administrator title and post-nominals saved."
+      );
+
+      await refreshAdminManager();
+
+    } catch (error) {
+      console.error(error);
+      setAdminMessage(
+        error?.message ||
+        "Administrator profile could not be saved.",
         true
       );
     }
