@@ -3454,9 +3454,9 @@ document.addEventListener("DOMContentLoaded", async function () {
       data,
       error
     } = await window.ctlSupabase
-      .from("certification_requests")
-      .select("*")
-      .order("requested_at", { ascending: false });
+      .rpc(
+        "get_certification_requests"
+      );
 
     if (error) {
       console.error(
