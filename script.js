@@ -819,6 +819,16 @@ document.addEventListener("DOMContentLoaded", async function () {
         <section id="certificationRequestsPanel" class="ctl-admin-panel">
           <h3>Certification Requests</h3>
           <div id="certificationPendingAlert" class="ctl-admin-message" style="display:none;"></div>
+
+          <div class="ctl-admin-actions" style="margin:12px 0 16px;">
+            <button type="button" id="showPendingCertificationsBtn" class="primary">
+              Pending Requests
+            </button>
+            <button type="button" id="showCompletedCertificationsBtn" class="secondary">
+              Completed Certifications
+            </button>
+          </div>
+
           <div id="certificationRequestsList" class="ctl-admin-preview">
             <p>Loading certification requests…</p>
           </div>
@@ -3438,6 +3448,9 @@ document.addEventListener("DOMContentLoaded", async function () {
   }
 
 
+  let certificationRequestView = "pending";
+
+
   async function refreshCertificationRequests() {
     const tab =
       document.getElementById(
@@ -3548,14 +3561,48 @@ document.addEventListener("DOMContentLoaded", async function () {
         "Certification Requests";
     }
 
-    if (!requests.length) {
+    const visibleRequests =
+      certificationRequestView === "completed"
+        ? requests.filter(request =>
+            request.status === "certified" ||
+            request.status === "declined"
+          )
+        : requests.filter(request =>
+            request.status === "pending" ||
+            request.status === "reviewed"
+          );
+
+    const pendingButton =
+      document.getElementById("showPendingCertificationsBtn");
+    const completedButton =
+      document.getElementById("showCompletedCertificationsBtn");
+
+    if (pendingButton) {
+      pendingButton.className =
+        certificationRequestView === "pending"
+          ? "primary"
+          : "secondary";
+    }
+
+    if (completedButton) {
+      completedButton.className =
+        certificationRequestView === "completed"
+          ? "primary"
+          : "secondary";
+    }
+
+    bindCertificationViewButtons();
+
+    if (!visibleRequests.length) {
       list.innerHTML =
-        "<p>There are no certification requests.</p>";
+        certificationRequestView === "completed"
+          ? "<p>There are no completed certification records.</p>"
+          : "<p>There are no pending certification requests.</p>";
       return;
     }
 
     list.innerHTML =
-      requests.map(request => {
+      visibleRequests.map(request => {
         const requested =
           request.requested_at
             ? new Date(request.requested_at).toLocaleString()
@@ -3593,22 +3640,24 @@ document.addEventListener("DOMContentLoaded", async function () {
               </div>
             </details>
 
-            ${request.status === "pending" || request.status === "reviewed" ? `
+            ${request.status !== "declined" ? `
               <div class="ctl-admin-actions" style="margin-top:14px;">
                 <button
                   type="button"
                   class="primary ctl-generate-certification-btn"
                   data-request-id="${request.id}"
                 >
-                  Generate Certified PDF
+                  ${request.status === "certified" ? "Generate Again" : "Generate Certified Results"}
                 </button>
-                <button
-                  type="button"
-                  class="secondary ctl-clear-certification-btn"
-                  data-request-id="${request.id}"
-                >
-                  Clear Request
-                </button>
+                ${request.status !== "certified" ? `
+                  <button
+                    type="button"
+                    class="secondary ctl-clear-certification-btn"
+                    data-request-id="${request.id}"
+                  >
+                    Clear Request
+                  </button>
+                ` : ""}
               </div>
             ` : ""}
           </article>
@@ -3625,7 +3674,7 @@ document.addEventListener("DOMContentLoaded", async function () {
           async function () {
             await generateCertifiedResultsPdf(
               Number(button.dataset.requestId),
-              requests
+              visibleRequests
             );
           }
         );
@@ -3645,6 +3694,30 @@ document.addEventListener("DOMContentLoaded", async function () {
           }
         );
       });
+  }
+
+
+  function bindCertificationViewButtons() {
+    const pendingButton =
+      document.getElementById("showPendingCertificationsBtn");
+    const completedButton =
+      document.getElementById("showCompletedCertificationsBtn");
+
+    if (pendingButton) {
+      pendingButton.onclick =
+        async function () {
+          certificationRequestView = "pending";
+          await refreshCertificationRequests();
+        };
+    }
+
+    if (completedButton) {
+      completedButton.onclick =
+        async function () {
+          certificationRequestView = "completed";
+          await refreshCertificationRequests();
+        };
+    }
   }
 
 
@@ -3760,8 +3833,9 @@ document.addEventListener("DOMContentLoaded", async function () {
 </style>
 </head>
 <body>
-  <div class="no-print">
-    <button onclick="window.print()">Print / Save as PDF</button>
+  <div class="no-print" style="display:flex;gap:10px;align-items:center;">
+    <button onclick="window.print()">Print Certified Results</button>
+    <button onclick="window.print()">Save as PDF</button>
   </div>
 
   <div style="margin-bottom:18px;">
@@ -3771,9 +3845,6 @@ document.addEventListener("DOMContentLoaded", async function () {
       style="max-width:320px;max-height:95px;object-fit:contain;"
     >
   </div>
-  <h1>Center for Teaching and Learning</h1>
-  <h2>Lackawanna College</h2>
-
   <div class="meta">
     <strong>Certified Participation Results:</strong>
       ${escapeAdminHtml(request.subject_person_name || "")}<br>
@@ -3883,7 +3954,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       );
 
       setAdminMessage(
-        `Certification request #${requestId} marked certified. Use Print / Save as PDF in the certification window.`
+        `Certification request #${requestId} marked certified. Use Print Certified Results or Save as PDF in the certification window. You can also generate it again or clear the request from Certification Requests.`
       );
 
       await refreshCertificationRequests();
