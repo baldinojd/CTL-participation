@@ -79,6 +79,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   let certificationDialog = null;
   let certificationForm = null;
   let certificationMessage = null;
+  let adminCertifyResultsBtn = null;
 
   function initializeCertificationRequestUI() {
     const exportTools =
@@ -90,6 +91,32 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     certificationRequestBtn =
       document.getElementById("requestCertifiedResultsBtn");
+
+    adminCertifyResultsBtn =
+      document.getElementById("adminCertifyResultsBtn");
+
+    if (!adminCertifyResultsBtn) {
+      adminCertifyResultsBtn =
+        document.createElement("button");
+
+      adminCertifyResultsBtn.id =
+        "adminCertifyResultsBtn";
+      adminCertifyResultsBtn.type =
+        "button";
+      adminCertifyResultsBtn.textContent =
+        "Certify";
+      adminCertifyResultsBtn.style.display =
+        "none";
+
+      exportTools.appendChild(
+        adminCertifyResultsBtn
+      );
+
+      adminCertifyResultsBtn.addEventListener(
+        "click",
+        certifyCurrentSearchResults
+      );
+    }
 
     if (!certificationRequestBtn) {
       certificationRequestBtn =
@@ -224,6 +251,8 @@ document.addEventListener("DOMContentLoaded", async function () {
       );
     }
 
+    installCleanExportHandlers();
+
     if (
       certificationForm &&
       !certificationForm.dataset.bound
@@ -270,6 +299,241 @@ document.addEventListener("DOMContentLoaded", async function () {
       return record;
     });
   }
+
+  function currentSearchResultsDocument() {
+    const snapshot =
+      getCertificationSnapshot();
+
+    const headers =
+      snapshot.length
+        ? Object.keys(snapshot[0])
+        : [];
+
+    const rows =
+      snapshot.map(row => `
+        <tr>
+          ${headers.map(header =>
+            `<td>${escapeAdminHtml(row?.[header] ?? "")}</td>`
+          ).join("")}
+        </tr>
+      `).join("");
+
+    return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>CTL Participation Search Results</title>
+<style>
+  @page { size: landscape; margin: 0.55in; }
+  body { font-family: Arial, Helvetica, sans-serif; color:#111; font-size:11px; }
+  img { max-width:320px; max-height:95px; object-fit:contain; margin-bottom:18px; }
+  .meta { margin:0 0 16px; line-height:1.5; }
+  table { width:100%; border-collapse:collapse; margin-top:12px; }
+  th, td { border:1px solid #aaa; padding:6px; text-align:left; vertical-align:top; }
+  th { background:#eee; }
+</style>
+</head>
+<body>
+  <img src="ctl-logo.PNG" alt="Center for Teaching and Learning">
+  <div class="meta">
+    <strong>Search:</strong> ${escapeAdminHtml(searchInput.value.trim() || "All matching records")}<br>
+    <strong>Academic Years:</strong> ${escapeAdminHtml(yearSelect.value || "All Years")}
+    ${throughYearSelect && throughYearSelect.value ? " through " + escapeAdminHtml(throughYearSelect.value) : ""}
+  </div>
+  <table>
+    <thead><tr>${headers.map(h => `<th>${escapeAdminHtml(h)}</th>`).join("")}</tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+</body>
+</html>`;
+  }
+
+
+  function printCurrentSearchResultsOnly() {
+    const snapshot =
+      getCertificationSnapshot();
+
+    if (!snapshot.length) {
+      window.alert("There are no displayed results to print.");
+      return;
+    }
+
+    const printWindow =
+      window.open("", "_blank");
+
+    if (!printWindow) {
+      window.alert(
+        "The print window was blocked. Allow pop-ups for this site and try again."
+      );
+      return;
+    }
+
+    const html =
+      currentSearchResultsDocument().replace(
+        "<head>",
+        `<head><base href="${escapeAdminHtml(window.location.href)}">`
+      );
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+
+    printWindow.onload =
+      function () {
+        printWindow.focus();
+        printWindow.print();
+      };
+  }
+
+
+  function installCleanExportHandlers() {
+    const exportTools =
+      document.getElementById("exportTools");
+
+    if (!exportTools || exportTools.dataset.cleanPrintBound) {
+      return;
+    }
+
+    exportTools.dataset.cleanPrintBound = "true";
+
+    exportTools.addEventListener(
+      "click",
+      function (event) {
+        const button =
+          event.target.closest("button");
+
+        if (!button) {
+          return;
+        }
+
+        const label =
+          button.textContent.trim().toLowerCase();
+
+        if (
+          label === "print" ||
+          label === "save as pdf" ||
+          label === "save pdf" ||
+          label === "print results"
+        ) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          printCurrentSearchResultsOnly();
+        }
+      },
+      true
+    );
+  }
+
+
+  async function certifyCurrentSearchResults() {
+    const snapshot =
+      getCertificationSnapshot();
+
+    if (!snapshot.length) {
+      window.alert(
+        "There are no displayed results to certify."
+      );
+      return;
+    }
+
+    try {
+      const editor =
+        await adminCurrentEditorRecord();
+
+      if (!editor?.can_certify) {
+        throw new Error(
+          "Your account does not have certification permission."
+        );
+      }
+
+      const subjectName =
+        selectedPerson
+          ? displayPersonName(selectedPerson)
+          : (searchInput.value.trim() || "Search Results");
+
+      const {
+        data,
+        error
+      } = await window.ctlSupabase.rpc(
+        "create_certification_request",
+        {
+          p_requester_name:
+            editor.display_name || "CTL Administrator",
+          p_requester_email:
+            editor.email || "",
+          p_subject_person_name:
+            subjectName,
+          p_search_query:
+            searchInput.value.trim(),
+          p_from_academic_year:
+            yearSelect.value || "",
+          p_through_academic_year:
+            throughYearSelect
+              ? (throughYearSelect.value || "")
+              : "",
+          p_semester:
+            semesterSelect.value || "",
+          p_event_type:
+            typeSelect.value || "",
+          p_result_snapshot:
+            snapshot
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      const requestId =
+        Array.isArray(data) && data.length
+          ? Number(data[0].request_id)
+          : Number(data?.request_id || data);
+
+      if (!requestId) {
+        throw new Error(
+          "The certification record could not be created."
+        );
+      }
+
+      const request = {
+        id: requestId,
+        status: "pending",
+        requester_name:
+          editor.display_name || "CTL Administrator",
+        requester_email:
+          editor.email || "",
+        subject_person_name:
+          subjectName,
+        search_query:
+          searchInput.value.trim(),
+        from_academic_year:
+          yearSelect.value || "",
+        through_academic_year:
+          throughYearSelect
+            ? (throughYearSelect.value || "")
+            : "",
+        semester:
+          semesterSelect.value || "",
+        event_type:
+          typeSelect.value || "",
+        result_snapshot:
+          snapshot
+      };
+
+      await generateCertifiedResultsPdf(
+        requestId,
+        [request]
+      );
+
+    } catch (error) {
+      console.error(error);
+      window.alert(
+        error?.message ||
+        "The certified copy could not be generated."
+      );
+    }
+  }
+
 
   async function submitCertificationRequest(event) {
     event.preventDefault();
@@ -386,6 +650,13 @@ document.addEventListener("DOMContentLoaded", async function () {
       personMode && hasResults
         ? ""
         : "none";
+
+    if (adminCertifyResultsBtn) {
+      adminCertifyResultsBtn.style.display =
+        currentAdminCanCertify && hasResults
+          ? ""
+          : "none";
+    }
   }
 
   initializeCertificationRequestUI();
@@ -787,7 +1058,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
               <div class="ctl-admin-field">
                 <label for="newAdminEmail">Lackawanna Email</label>
-                <input id="newAdminEmail" type="email" placeholder="name@lackawanna.edu" required>
+                <input id="newAdminEmail" type="email" placeholder="name@lackawanna.edu or name@falcons.lackawanna.edu" required>
               </div>
 
               <div class="ctl-admin-field">
@@ -4309,9 +4580,13 @@ document.addEventListener("DOMContentLoaded", async function () {
       return;
     }
 
-    if (!email.endsWith("@lackawanna.edu")) {
+    const allowedAdminEmail =
+      email.endsWith("@lackawanna.edu") ||
+      email.endsWith("@falcons.lackawanna.edu");
+
+    if (!allowedAdminEmail) {
       setAdminMessage(
-        "Administrator access must use a Lackawanna email address.",
+        "Administrator access must use an @lackawanna.edu or @falcons.lackawanna.edu email address.",
         true
       );
       return;
