@@ -4614,7 +4614,22 @@ document.addEventListener("DOMContentLoaded", async function () {
         );
       }
 
-      event.currentTarget.reset();
+      const newAdminNameField =
+        document.getElementById("newAdminName");
+      const newAdminEmailField =
+        document.getElementById("newAdminEmail");
+      const newAdminTitleField =
+        document.getElementById("newAdminTitle");
+      const newAdminPostNominalsField =
+        document.getElementById("newAdminPostNominals");
+      const newAdminCanCertifyField =
+        document.getElementById("newAdminCanCertify");
+
+      if (newAdminNameField) newAdminNameField.value = "";
+      if (newAdminEmailField) newAdminEmailField.value = "";
+      if (newAdminTitleField) newAdminTitleField.value = "";
+      if (newAdminPostNominalsField) newAdminPostNominalsField.value = "";
+      if (newAdminCanCertifyField) newAdminCanCertifyField.checked = false;
 
       setAdminMessage(
         `${name} has been pre-authorized. They can now visit this page and sign in with Microsoft.`
